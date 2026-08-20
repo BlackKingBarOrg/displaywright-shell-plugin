@@ -337,8 +337,16 @@ PanelWindow {
       "theme=$(omarchy-theme-switcher); [[ -n $theme ]] && omarchy-theme-set \"$theme\" >/dev/null 2>&1 &"]
   }
 
+  // The window is a separate install: this plugin is only the renderer, and
+  // somebody who arrived through `omarchy plugin add` has no `displaywright`
+  // on PATH. Launching a missing command fails silently, which reads as a
+  // double-click that does nothing -- so say where the window is instead.
   Process {
     id: displaywrightProc
-    command: ["displaywright"]
+    command: ["bash", "-c",
+      "if command -v displaywright >/dev/null 2>&1; then exec displaywright; fi; "
+      + "notify-send -a Displaywright 'Displaywright' "
+      + "'This is the wallpaper renderer. The window that drives it is a "
+      + "separate install: github.com/BlackKingBarOrg/displaywright'"]
   }
 }
