@@ -4,7 +4,7 @@ A different wallpaper on each display, with every fit mode Windows has.
 
 Omarchy's built-in background renderer shows **one image on every display,
 always cropped to fill**. This plugin replaces it with one that takes a picture
-per display, a fit for each, and a colour or video where you want one.
+per display, a fit for each, and a colour or a video where you want one.
 
 ![each display showing its own wallpaper, at its real position, size and rotation](preview.png)
 
@@ -20,47 +20,50 @@ you, and two plugins drawing on `WlrLayer.Background` means the wallpaper you
 get is a coin flip per session. Theme switching keeps working — this plugin
 implements the whole `background` IPC target, palette transition included.
 
-Needs Omarchy 4.x with `omarchy-shell`, plus `qt6-multimedia-ffmpeg` if you want
-video wallpapers.
-
-### You probably want the window too
-
-This repository is the **renderer only** — QML that runs inside `omarchy-shell`.
-It has no window and installs no command. To pick wallpapers by clicking rather
-than by editing JSON, install the app:
-
-```bash
-git clone https://github.com/BlackKingBarOrg/displaywright
-cd displaywright && make install
-displaywright
-```
-
-It gives you a picture library, live previews of every fit, and a display
-arrangement editor on a second page. `make plugin` there installs this same
-renderer and disables `omarchy.background` in one step, so if you start from the
-app you can skip the two commands above.
+Needs Omarchy 4.x with `omarchy-shell`. Video wallpapers also need
+`qt6-multimedia-ffmpeg`.
 
 ## Use
 
-Everything is one file: `~/.config/displaywright/wallpapers.json`. The renderer
-watches it, so edits take effect immediately.
+Nothing changes until you ask for something. Every display keeps following the
+Omarchy theme background, and **SUPER + CTRL + SPACE** still switches it for all
+of them — so a fresh install looks and behaves exactly like stock Omarchy.
+
+What you choose per display lives in one file:
+
+```
+~/.config/displaywright/wallpapers.json
+```
+
+It does not exist yet. Create it, and the renderer picks it up the moment you
+save — no restart, no command to run.
+
+### Give each display its own wallpaper
+
+First, the names of your displays:
+
+```bash
+hyprctl monitors -j | jq -r '.[].name'      # e.g. eDP-1, DP-1
+```
+
+Then write them in, with a picture for each:
 
 ```json
 {
   "version": 1,
   "monitors": {
-    "eDP-1": { "kind": "image", "path": "/home/you/a.jpg", "fit": "fill" },
-    "DP-1":  { "kind": "image", "path": "/home/you/b.png", "fit": "center",
-               "backdrop": "#101820" },
-    "DP-2":  { "kind": "color", "color": "#101820" }
-  },
-  "span": null
+    "eDP-1": { "kind": "image", "path": "/home/you/Pictures/laptop.jpg", "fit": "fill" },
+    "DP-1":  { "kind": "image", "path": "/home/you/Pictures/desk.png",  "fit": "fill" }
+  }
 }
 ```
 
-A display that is not listed keeps following the Omarchy theme background, so a
-fresh install looks exactly like stock Omarchy. Run `hyprctl monitors -j` if you
-are not sure what your outputs are called.
+Save it and both displays change. A display you leave out of `monitors` keeps
+following the theme, so you can take over one screen and leave the rest alone.
+
+### Choose how a picture fills the screen
+
+Change `"fit"` on any entry:
 
 | `fit` | Windows | What it does |
 |---|---|---|
@@ -70,29 +73,66 @@ are not sure what your outputs are called.
 | `tile` | Tile | Repeats the file at its own resolution from the top-left corner. |
 | `center` | Center | Draws the file at its own resolution in the middle, `backdrop` around it. |
 
-Center and Tile are measured in **device pixels**, so they look the way they do
-on Windows even on a scaled display.
-
-**One picture across every display** — set `span` instead of listing monitors,
-and it wins over anything in `monitors`:
+`fit` and `center` leave bare space, so they take a colour behind them:
 
 ```json
-{ "version": 1, "monitors": {}, "span": { "kind": "image", "path": "/home/you/wide.jpg" } }
+"DP-1": { "kind": "image", "path": "/home/you/art.png", "fit": "center",
+          "backdrop": "#101820" }
+```
+
+Center and Tile are measured in **device pixels**, so a picture is the size it
+would be on Windows even on a scaled display.
+
+### A flat colour instead of a picture
+
+```json
+"DP-1": { "kind": "color", "color": "#101820" }
+```
+
+### One picture across every display
+
+Use `span` instead of listing monitors. It wins over anything in `monitors`:
+
+```json
+{ "version": 1, "monitors": {},
+  "span": { "kind": "image", "path": "/home/you/Pictures/ultrawide.jpg" } }
 ```
 
 The renderer cuts it from your live display list, so moving a display re-cuts
-the picture on its own.
+the picture on its own. Displays that are not flush leave part of the picture in
+the gap between them, where nothing can draw it.
 
-**`kind`** is `image`, `color` (with `"color": "#101820"`) or `video`. Video
-loops muted and pauses under a fullscreen window; it type-checks clean but has
-not been run on hardware yet, so treat it as untested.
+### A video
 
-**Double-clicking the desktop** opens the picker for whatever governs that
-display — the app where this plugin decides the picture, Omarchy's own switcher
-where the theme still does. Right-click always reaches the theme switcher.
+```json
+"DP-1": { "kind": "video", "path": "/home/you/Videos/loop.mp4" }
+```
 
-Anything unparseable in the file is dropped rather than raised on: a mangled
-entry costs you that wallpaper, never your desktop.
+It loops, stays muted, and stops decoding under a fullscreen window. This one
+type-checks clean but has not been run on hardware yet — treat it as untested.
+
+### Clicking the desktop
+
+Double-click a display's background to open the picker for whatever governs it:
+Omarchy's own background switcher where the display still follows the theme, and
+the Displaywright window where this plugin has taken over. Right-click always
+reaches the theme switcher.
+
+### If something is wrong with the file
+
+A line the renderer cannot read is dropped rather than raised on — a mangled
+entry costs you that wallpaper, never your desktop. `journalctl --user -u
+omarchy-shell` (or wherever your shell logs) carries a `displaywright:` line
+saying which one.
+
+## Prefer clicking to editing JSON?
+
+The window that drives all of this — a picture library, a live preview of every
+fit, and a display arrangement editor — is a separate project:
+
+**https://github.com/BlackKingBarOrg/displaywright**
+
+It writes the same file, and installs this same renderer for you.
 
 ## Remove
 
@@ -103,9 +143,8 @@ omarchy plugin enable omarchy.background
 
 ## Issues
 
-This repository is generated from `plugin/` in
-[BlackKingBarOrg/displaywright](https://github.com/BlackKingBarOrg/displaywright),
-so bug reports and pull requests belong there.
+This repository is generated from `plugin/` in the project above, so bug reports
+and pull requests belong there.
 
 ## License
 
