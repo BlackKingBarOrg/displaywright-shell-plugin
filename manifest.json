@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "ai.bkblab.displaywright",
+  "name": "Displaywright",
+  "version": "0.1.0",
+  "author": "BlackKingBar",
+  "description": "Per-display wallpapers with Windows-style fit modes, and the desktop background renderer that replaces omarchy.background",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Wallpaper.qml"
+  }
+}
