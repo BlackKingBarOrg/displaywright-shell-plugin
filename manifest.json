@@ -3,8 +3,9 @@
   "id": "ai.bkblab.displaywright",
   "name": "Displaywright",
   "version": "0.1.0",
-  "author": "BlackKingBar",
-  "description": "Per-display wallpapers with Windows-style fit modes, and the desktop background renderer that replaces omarchy.background",
+  "author": "bkblab.ai",
+  "license": "MIT",
+  "description": "A different wallpaper on each display, with every fit mode Windows has. Replaces Omarchy's built-in background renderer.",
   "kinds": [
     "service"
   ],
