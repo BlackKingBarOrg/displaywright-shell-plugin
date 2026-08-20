@@ -1,10 +1,15 @@
 // One wallpaper surface, covering one output.
 //
 // It draws a spanned source if one is set, otherwise this output's own source,
-// and *nothing at all* if neither exists -- the window goes invisible so
+// and *nothing at all* if neither exists: every pixel stays transparent and
 // omarchy.background shows through untouched, which is what makes installing
-// this plugin a no-op until you pin something. Changing between two pinned
-// pictures crossfades through a slanted wipe rather than cutting.
+// this plugin change nothing until you pin something. Changing between two
+// pinned pictures crossfades through a slanted wipe rather than cutting.
+//
+// The surface stays mapped even while it is drawing nothing, because pixels and
+// input are separate questions. Fighting over pixels is what breaks a desktop;
+// owning the click is the entire point of installing a wallpaper tool, so the
+// double-click below is handled here on every output, pinned or not.
 
 import QtQuick
 import QtQuick.Effects
@@ -28,10 +33,7 @@ PanelWindow {
   WlrLayershell.namespace: "displaywright"
   WlrLayershell.layer: WlrLayer.Background
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-  // Invisible, not merely transparent, when this output has no wallpaper of
-  // ours: an unmapped surface cannot cover the stock renderer, cannot swallow
-  // the double-click it handles, and costs nothing to composite.
-  visible: surface.hasContent && !remapGuard.remapping
+  visible: !remapGuard.remapping
 
   // A background surface that parks its render loop has been seen to lose its
   // committed buffer and leave the desktop black. Wallpapers are cheap to keep
@@ -71,10 +73,8 @@ PanelWindow {
     return { dx: screen.x - box.x, dy: screen.y - box.y, w: box.w, h: box.h }
   }
 
-  // Nothing pinned means nothing drawn. omarchy.background owns this output.
+  // Nothing pinned means nothing drawn. omarchy.background owns these pixels.
   readonly property var effectiveSource: pinnedSource
-
-  readonly property bool hasContent: shownSource !== null || incomingSource !== null
 
   // Identity of a source for change detection. Span geometry is deliberately
   // left out: nudging a display should re-cut the picture, not wipe to it.
@@ -307,19 +307,26 @@ PanelWindow {
     }
   }
 
-  // This surface only exists on an output we have taken over, so a click here
-  // is about *our* wallpaper; an output still following the theme has no
-  // surface of ours at all and Omarchy's own background handler gets the click
-  // exactly as it did before this plugin was installed. Right-click still
-  // reaches the theme switcher either way.
+  // Double-click picks a wallpaper for *this* display, whether or not it
+  // already has one -- which is the only way a fresh install is usable at all,
+  // since on a fresh install no display has one. Right-click still reaches the
+  // theme switcher, so nothing that worked before is gone.
   MouseArea {
     anchors.fill: parent
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     onDoubleClicked: function (mouse) {
       if (mouse.button === Qt.RightButton) themeSwitcherProc.running = true
-      else displaywrightProc.running = true
+      else if (!pickerProc.running) pickerProc.running = true
       mouse.accepted = true
     }
+  }
+
+  // Omarchy's own image picker, driven by a script shipped beside this file so
+  // the shell process never blocks on the round trip.
+  Process {
+    id: pickerProc
+    command: [(surface.controller ? surface.controller.pluginDir : "") + "/pick-wallpaper.sh",
+              surface.outputName]
   }
 
   Process {
@@ -328,16 +335,4 @@ PanelWindow {
       "theme=$(omarchy-theme-switcher); [[ -n $theme ]] && omarchy-theme-set \"$theme\" >/dev/null 2>&1 &"]
   }
 
-  // The window is a separate install: this plugin is only the renderer, and
-  // somebody who arrived through `omarchy plugin add` has no `displaywright`
-  // on PATH. Launching a missing command fails silently, which reads as a
-  // double-click that does nothing -- so say where the window is instead.
-  Process {
-    id: displaywrightProc
-    command: ["bash", "-c",
-      "if command -v displaywright >/dev/null 2>&1; then exec displaywright; fi; "
-      + "notify-send -a Displaywright 'Displaywright' "
-      + "'This is the wallpaper renderer. The window that drives it is a "
-      + "separate install: github.com/BlackKingBarOrg/displaywright'"]
-  }
 }

@@ -31,6 +31,12 @@ Item {
   readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")
   readonly property string configPath: configHome + "/displaywright/wallpapers.json"
 
+  // Where this plugin was loaded from. The shell stamps it into the manifest;
+  // hardcoding an install path would break a symlinked checkout and anyone who
+  // installed by hand somewhere else.
+  readonly property string pluginDir: manifest && manifest.__sourceDir
+    ? String(manifest.__sourceDir) : ""
+
   // ---------------------------------------------------------------- config
 
   // { outputName: source }. An absent output is left to omarchy.background.

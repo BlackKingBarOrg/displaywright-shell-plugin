@@ -26,7 +26,22 @@ Needs Omarchy 4.x with `omarchy-shell`. Video wallpapers also need
 
 ## Use
 
-What you choose per display lives in one file:
+**Double-click a display's background.** Omarchy's own picture picker opens, and
+whatever you choose becomes that display's wallpaper — that display only, the
+rest of your desktop untouched. Do it again on the next screen to give it a
+different one.
+
+It offers your theme's backgrounds, anything you have dropped in
+`~/.config/omarchy/backgrounds/<theme>/`, and the folder the Displaywright app
+keeps its pictures in. Right-click still opens the theme switcher, as always.
+
+That is the whole of it for most people. Everything below is the file the picker
+writes, for when you want a fit other than the default, a flat colour, a video,
+or one picture spanned across every screen.
+
+### The config file
+
+What each display shows lives in one file:
 
 ```
 ~/.config/displaywright/wallpapers.json
@@ -35,7 +50,7 @@ What you choose per display lives in one file:
 It does not exist yet. Create it, and the renderer picks it up the moment you
 save — no restart, no command to run.
 
-### Give each display its own wallpaper
+### Setting a display by hand
 
 First, the names of your displays:
 
@@ -108,13 +123,6 @@ the gap between them, where nothing can draw it.
 
 It loops, stays muted, and stops decoding under a fullscreen window. This one
 type-checks clean but has not been run on hardware yet — treat it as untested.
-
-### Clicking the desktop
-
-A display you have not given a picture to behaves exactly as it did before: this
-plugin puts no surface on it, so Omarchy's own double-click handler gets the
-click. On a display this plugin has taken over, double-click opens the
-Displaywright window and right-click still reaches the theme switcher.
 
 ### If something is wrong with the file
 
