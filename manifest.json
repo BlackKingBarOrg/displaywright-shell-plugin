@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "bkblab.ai",
   "license": "MIT",
-  "description": "A different wallpaper on each display, with every fit mode Windows has. Replaces Omarchy's built-in background renderer.",
+  "description": "A different wallpaper on each display, with every fit mode Windows has. Double-click a display to pick its own.",
   "kinds": [
     "service"
   ],
