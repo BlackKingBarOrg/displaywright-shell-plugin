@@ -1,10 +1,10 @@
 // One wallpaper surface, covering one output.
 //
-// What it draws is decided in this order: a spanned source if one is set, then
-// this output's own source, then the Omarchy theme background. Changing any of
-// those crossfades through a slanted wipe rather than cutting, and a theme
-// switch applies its palette at the moment the wipe starts so the bar and the
-// picture change together.
+// It draws a spanned source if one is set, otherwise this output's own source,
+// and *nothing at all* if neither exists -- the window goes invisible so
+// omarchy.background shows through untouched, which is what makes installing
+// this plugin a no-op until you pin something. Changing between two pinned
+// pictures crossfades through a slanted wipe rather than cutting.
 
 import QtQuick
 import QtQuick.Effects
@@ -28,7 +28,10 @@ PanelWindow {
   WlrLayershell.namespace: "displaywright"
   WlrLayershell.layer: WlrLayer.Background
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-  visible: !remapGuard.remapping
+  // Invisible, not merely transparent, when this output has no wallpaper of
+  // ours: an unmapped surface cannot cover the stock renderer, cannot swallow
+  // the double-click it handles, and costs nothing to composite.
+  visible: surface.hasContent && !remapGuard.remapping
 
   // A background surface that parks its render loop has been seen to lose its
   // committed buffer and leave the desktop black. Wallpapers are cheap to keep
@@ -68,16 +71,10 @@ PanelWindow {
     return { dx: screen.x - box.x, dy: screen.y - box.y, w: box.w, h: box.h }
   }
 
-  readonly property bool followsTheme: pinnedSource === null
+  // Nothing pinned means nothing drawn. omarchy.background owns this output.
+  readonly property var effectiveSource: pinnedSource
 
-  // The theme background is modelled as an ordinary source so the renderers
-  // need no special case for it.
-  readonly property var effectiveSource: {
-    if (pinnedSource) return pinnedSource
-    var path = controller ? String(controller.themeBackground || "") : ""
-    if (path.length === 0) return null
-    return { kind: "image", path: path, fit: "fill" }
-  }
+  readonly property bool hasContent: shownSource !== null || incomingSource !== null
 
   // Identity of a source for change detection. Span geometry is deliberately
   // left out: nudging a display should re-cut the picture, not wipe to it.
@@ -111,7 +108,6 @@ PanelWindow {
       shownSource = next
       incomingSource = null
       revealProgress = 1
-      if (controller) controller.applyPendingTheme()
       return
     }
     if (signatureOf(next) === signatureOf(shownSource)) {
@@ -139,7 +135,6 @@ PanelWindow {
       return
     }
     revealTimeout.stop()
-    if (controller) controller.applyPendingTheme()
     revealAnimation.restart()
   }
 
@@ -153,7 +148,6 @@ PanelWindow {
       if (!surface.incomingSource || surface.revealProgress !== 0) return
       console.warn("displaywright: " + surface.outputName
                    + " gave up waiting for " + surface.signatureOf(surface.incomingSource))
-      if (surface.controller) surface.controller.applyPendingTheme()
       revealAnimation.restart()
     }
   }
@@ -200,12 +194,14 @@ PanelWindow {
     }
   }
 
-  // Shows through wherever a Fit or Center does not reach.
+  // Shows through wherever a Fit or Center does not reach. Transparent while
+  // there is no wallpaper here, so an in-flight surface never flashes black
+  // over the renderer underneath.
   Rectangle {
     anchors.fill: parent
     color: {
       var src = surface.shownSource
-      if (!src) return "#000000"
+      if (!src) return "transparent"
       var value = String(src.backdrop || "#000000")
       return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value) ? value : "#000000"
     }
@@ -311,24 +307,19 @@ PanelWindow {
     }
   }
 
-  // Double-click acts on whatever governs this output: displaywright's own
-  // window where it decides the picture, Omarchy's switcher where the theme
-  // still does. Right-click always reaches the theme switcher, as before.
+  // This surface only exists on an output we have taken over, so a click here
+  // is about *our* wallpaper; an output still following the theme has no
+  // surface of ours at all and Omarchy's own background handler gets the click
+  // exactly as it did before this plugin was installed. Right-click still
+  // reaches the theme switcher either way.
   MouseArea {
     anchors.fill: parent
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     onDoubleClicked: function (mouse) {
       if (mouse.button === Qt.RightButton) themeSwitcherProc.running = true
-      else if (surface.followsTheme) backgroundSwitcherProc.running = true
       else displaywrightProc.running = true
       mouse.accepted = true
     }
-  }
-
-  Process {
-    id: backgroundSwitcherProc
-    command: ["bash", "-c",
-      "background=$(omarchy-theme-bg-switcher); [[ -n $background ]] && omarchy-theme-bg-set \"$background\""]
   }
 
   Process {

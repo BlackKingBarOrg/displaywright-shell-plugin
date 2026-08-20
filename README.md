@@ -3,8 +3,9 @@
 A different wallpaper on each display, with every fit mode Windows has.
 
 Omarchy's built-in background renderer shows **one image on every display,
-always cropped to fill**. This plugin replaces it with one that takes a picture
-per display, a fit for each, and a colour or a video where you want one.
+always cropped to fill**. This plugin draws on top of it, taking over only the
+displays you give a picture to — with a fit for each, and a colour or a video
+where you want one.
 
 ![each display showing its own wallpaper, at its real position, size and rotation](preview.png)
 
@@ -12,22 +13,18 @@ per display, a fit for each, and a colour or a video where you want one.
 
 ```bash
 omarchy plugin add https://github.com/BlackKingBarOrg/displaywright-shell-plugin.git --enable
-omarchy plugin disable omarchy.background
 ```
 
-**Both lines.** `omarchy plugin add` will not disable the built-in renderer for
-you, and two plugins drawing on `WlrLayer.Background` means the wallpaper you
-get is a coin flip per session. Theme switching keeps working — this plugin
-implements the whole `background` IPC target, palette transition included.
+That is the whole install, and it changes nothing yet. The stock renderer stays
+switched on and keeps every display exactly as it was — along with the theme
+background, the SUPER + CTRL + SPACE switcher and the palette that changes with
+your theme. This plugin only draws on a display once you have given that display
+a picture of its own.
 
 Needs Omarchy 4.x with `omarchy-shell`. Video wallpapers also need
 `qt6-multimedia-ffmpeg`.
 
 ## Use
-
-Nothing changes until you ask for something. Every display keeps following the
-Omarchy theme background, and **SUPER + CTRL + SPACE** still switches it for all
-of them — so a fresh install looks and behaves exactly like stock Omarchy.
 
 What you choose per display lives in one file:
 
@@ -58,8 +55,9 @@ Then write them in, with a picture for each:
 }
 ```
 
-Save it and both displays change. A display you leave out of `monitors` keeps
-following the theme, so you can take over one screen and leave the rest alone.
+Save it and both displays change. A display you leave out of `monitors` is not
+touched at all — the stock renderer keeps drawing it, so you can take over one
+screen and leave the rest of your desktop exactly as it was.
 
 ### Choose how a picture fills the screen
 
@@ -113,10 +111,10 @@ type-checks clean but has not been run on hardware yet — treat it as untested.
 
 ### Clicking the desktop
 
-Double-click a display's background to open the picker for whatever governs it:
-Omarchy's own background switcher where the display still follows the theme, and
-the Displaywright window where this plugin has taken over. Right-click always
-reaches the theme switcher.
+A display you have not given a picture to behaves exactly as it did before: this
+plugin puts no surface on it, so Omarchy's own double-click handler gets the
+click. On a display this plugin has taken over, double-click opens the
+Displaywright window and right-click still reaches the theme switcher.
 
 ### If something is wrong with the file
 
@@ -138,8 +136,9 @@ It writes the same file, and installs this same renderer for you.
 
 ```bash
 omarchy plugin remove ai.bkblab.displaywright
-omarchy plugin enable omarchy.background
 ```
+
+Nothing to put back: the stock renderer was never switched off.
 
 ## Issues
 

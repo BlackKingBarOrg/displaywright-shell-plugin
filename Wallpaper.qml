@@ -1,23 +1,23 @@
 // Displaywright's renderer: one wallpaper surface per output.
 //
-// This plugin *replaces* omarchy.background rather than sitting beside it.
-// Two plugins drawing full-screen surfaces on WlrLayer.Background have no
-// defined stacking order between them, so only one of them can own the layer.
-// Owning it means inheriting two jobs from the plugin we displace:
+// This plugin sits *on top of* omarchy.background rather than replacing it.
+// Its surface is transparent on every output it has no opinion about, so the
+// stock renderer shows through and keeps doing its jobs -- the `background` IPC
+// target, the SUPER + CTRL + SPACE switcher, and the palette that rides along
+// with a theme transition. A fresh install therefore changes nothing at all
+// until you pin a wallpaper to a display.
 //
-//   1. the `background` IPC target, so `omarchy-theme-bg-set`, the SUPER +
-//      CTRL + SPACE switcher and `omarchy-theme-set` keep working; and
-//   2. applying the theme palette that rides along with `themeTransition`.
-//      That call is how the whole shell recolours on a theme switch, and it
-//      lands nowhere else. Dropping it would leave the bar on the old palette.
-//
-// Outputs displaywright has no opinion about keep following the theme
-// background, so a fresh install looks and behaves exactly like stock Omarchy.
+// Two surfaces on WlrLayer.Background have no stacking order defined by
+// Wayland; the one created last is drawn on top. Omarchy's plugin registry
+// merges first-party manifests before third-party ones and mounts services in
+// that order, so a plugin like this one is always created after
+// omarchy.background and lands above it. That is an implementation detail
+// rather than a guarantee -- but the failure mode if it ever changed is a
+// pinned wallpaper hidden behind the theme's, not a black desktop.
 
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import qs.Commons
 
 Item {
   id: root
@@ -30,11 +30,10 @@ Item {
   readonly property string home: Quickshell.env("HOME")
   readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")
   readonly property string configPath: configHome + "/displaywright/wallpapers.json"
-  readonly property string themeLink: home + "/.local/state/omarchy/current/background"
 
   // ---------------------------------------------------------------- config
 
-  // { outputName: source }. Absent output means "follow the theme".
+  // { outputName: source }. An absent output is left to omarchy.background.
   property var monitorSources: ({})
   // One source stretched over every output; wins over monitorSources.
   property var spanSource: null
@@ -65,7 +64,7 @@ Item {
       } catch (e) {
         // A half-written or hand-mangled config should cost the user their
         // custom wallpapers for a moment, not their desktop: fall through with
-        // empty values and every output reverts to the theme background.
+        // empty values and every output goes back to the theme background.
         console.warn("displaywright: could not parse " + root.configPath + ": " + e)
       }
     }
@@ -127,63 +126,15 @@ Item {
     function onScreensChanged() { root.refreshSpanBox() }
   }
 
-  // ------------------------------------------------------ theme background
-
-  function refreshTheme() {
-    if (!themeLinkProc.running) themeLinkProc.running = true
-  }
-
-  Process {
-    id: themeLinkProc
-    command: ["readlink", "-f", root.themeLink]
-    stdout: StdioCollector {
-      onStreamFinished: {
-        var path = String(text || "").trim()
-        if (path.length > 0) root.themeBackground = path
-      }
-    }
-  }
-
-  property string themeBackground: ""
-
-  // Theme payload that arrived with a themeTransition and is waiting for the
-  // reveal to start, so the palette flips together with the picture instead of
-  // a frame or two ahead of it.
-  property string pendingColors: ""
-  property string pendingShell: ""
-  property bool themePending: false
-
-  function applyPendingTheme() {
-    if (!themePending) return
-    themePending = false
-    themeFallbackTimer.stop()
-    Color.loadColors(pendingColors)
-    // loadShell also refreshes Style, so the type scale changes with the
-    // palette rather than one repaint later.
-    Color.loadShell(pendingShell)
-    Style.scheduleRefresh()
-    pendingColors = ""
-    pendingShell = ""
-  }
-
-  // Every output may be pinned, in which case no surface will ever start a
-  // reveal and nothing would apply the palette. Apply it anyway, shortly.
-  Timer {
-    id: themeFallbackTimer
-    interval: 300
-    onTriggered: root.applyPendingTheme()
-  }
-
   // ------------------------------------------------------------------- IPC
 
-  // Displaywright's own surface. The config file is the source of truth; this
-  // only spares the caller the filesystem-watch latency.
+  // Only displaywright's own target. `background` belongs to omarchy.background
+  // again, along with everything a theme switch needs.
   IpcHandler {
     target: "displaywright"
 
     function reload(): string {
       configFile.reload()
-      root.refreshTheme()
       root.refreshSpanBox()
       return "ok"
     }
@@ -194,9 +145,13 @@ Item {
       for (var i = 0; i < screens.length; i++) {
         var name = screens[i].name
         var src = root.sourceFor(name)
-        var where = root.spanSource ? "span" : (src ? "pinned" : "theme")
-        var what = src ? (src.kind === "color" ? src.color : src.path) : root.themeBackground
-        out.push(name + "\t" + where + "\t" + (src && src.fit ? src.fit : "fill") + "\t" + what)
+        if (!src) {
+          out.push(name + "\ttheme\t-\t-")
+          continue
+        }
+        var what = src.kind === "color" ? String(src.color || "") : String(src.path || "")
+        out.push(name + "\t" + (root.spanSource ? "span" : "pinned")
+                 + "\t" + String(src.fit || "fill") + "\t" + what)
       }
       return out.join("\n")
     }
@@ -206,49 +161,9 @@ Item {
     }
   }
 
-  // Drop-in for the target omarchy.background used to own. Everything here
-  // affects the theme background only, which is what the unpinned outputs draw.
-  IpcHandler {
-    target: "background"
-
-    function refresh(): void {
-      root.refreshTheme()
-    }
-
-    function set(path: string): void {
-      var next = String(path || "").trim()
-      if (next.length > 0) root.themeBackground = next
-    }
-
-    function setInstant(path: string): void {
-      set(path)
-    }
-
-    function transition(fromPath: string, path: string): void {
-      set(path)
-    }
-
-    function themeTransition(fromPath: string, path: string, finalPath: string,
-                             colorsB64: string, shellB64: string): void {
-      root.pendingColors = Util.decodeBase64(colorsB64)
-      root.pendingShell = Util.decodeBase64(shellB64)
-      root.themePending = true
-      themeFallbackTimer.restart()
-      // `path` is a short-lived snapshot omarchy-theme-set deletes a few
-      // seconds later; `finalPath` is the file that stays. Showing the durable
-      // one avoids a surface pointing at a deleted inode after the transition.
-      var next = String(finalPath || path || "").trim()
-      if (next.length > 0) root.themeBackground = next
-      else root.applyPendingTheme()
-    }
-  }
-
   // --------------------------------------------------------------- surfaces
 
-  Component.onCompleted: {
-    refreshTheme()
-    refreshSpanBox()
-  }
+  Component.onCompleted: refreshSpanBox()
 
   Variants {
     model: Quickshell.screens
