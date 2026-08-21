@@ -173,4 +173,74 @@ TestCase {
     verify(bare !== null, "the view threw when built without a controller")
     bare.destroy()
   }
+
+  // ------------------------------------------------------------- dragging
+  //
+  // The press-move-release path is where an arrangement tool is actually used
+  // and where the arithmetic is easiest to get wrong, so it is driven for real
+  // rather than by calling snapAndResolve directly.
+
+  function tileFor(name) { return find("tile-" + name) }
+
+  function dragBy(name, dxLogical, dyLogical) {
+    const tile = tileFor(name)
+    verify(tile !== null, "no tile for " + name)
+    // Moving a display changes the bounding box, and with it the zoom the next
+    // drag is measured in, so this is read fresh every time.
+    const zoom = tile.parent.zoom
+    const cx = tile.width / 2
+    const cy = tile.height / 2
+    mousePress(tile, cx, cy)
+    // Two moves: one to start the drag, one to land it. A single event can be
+    // taken for a click.
+    mouseMove(tile, cx + dxLogical * zoom / 2, cy + dyLogical * zoom / 2)
+    mouseMove(tile, cx + dxLogical * zoom, cy + dyLogical * zoom)
+    mouseRelease(tile, cx + dxLogical * zoom, cy + dyLogical * zoom)
+  }
+
+  function test_a_tile_exists_for_every_display() {
+    verify(tileFor("eDP-1") !== null)
+    verify(tileFor("DP-1") !== null)
+  }
+
+  function test_pressing_a_tile_selects_that_display() {
+    compare(controller.selectedName, "eDP-1")
+    const tile = tileFor("DP-1")
+    mousePress(tile, tile.width / 2, tile.height / 2)
+    mouseRelease(tile, tile.width / 2, tile.height / 2)
+    compare(controller.selectedName, "DP-1")
+  }
+
+  function test_a_rough_drag_lands_flush_against_the_neighbour() {
+    // eDP-1 is 1600x1000 logical at the origin, so the shared edge is x=1600.
+    // Drag DP-1 well clear, then drop it *near* the edge rather than on it:
+    // landing exactly is the snapping's job, not the test's.
+    dragBy("DP-1", 900, 0)
+    verify(controller.states[1].x > 1600, "the drag did not move anything")
+
+    // Aim 40px short of flush -- inside the snap threshold, nowhere near it by
+    // accident.
+    dragBy("DP-1", 1640 - controller.states[1].x, 0)
+    compare(controller.states[1].x, 1600, "did not snap flush")
+    compare(controller.states[1].y, 0)
+  }
+
+  function test_a_drop_far_from_anything_keeps_the_free_position() {
+    dragBy("DP-1", 3000, 900)
+    verify(controller.states[1].x > 3000, "a far drop was pulled back to a neighbour")
+    verify(controller.states[1].y > 600)
+  }
+
+  function test_a_drag_never_lands_on_top_of_a_neighbour() {
+    dragBy("DP-1", -1400, 0)
+    verify(!Geo.rectsOverlap(Geo.rectOf(controller.states[0]), Geo.rectOf(controller.states[1])),
+      "a drag left two displays overlapping")
+  }
+
+  function test_dragging_marks_the_layout_unapplied() {
+    compare(controller.dirty, false)
+    dragBy("DP-1", 0, 700)
+    compare(controller.dirty, true, "a drag did not register as a change")
+    verify(find("apply").enabled)
+  }
 }

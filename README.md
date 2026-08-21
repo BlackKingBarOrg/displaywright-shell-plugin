@@ -131,10 +131,33 @@ entry costs you that wallpaper, never your desktop. `journalctl --user -u
 omarchy-shell` (or wherever your shell logs) carries a `displaywright:` line
 saying which one.
 
+## Arranging your displays
+
+The plugin also carries a display arrangement editor: drag your outputs into
+place, set resolution, refresh rate, scale and rotation, apply it live, and keep
+or revert with a fifteen-second countdown that defaults to revert — so a display
+that goes black cannot lock you out. Keeping it writes the layout to
+`~/.config/hypr/monitors.lua`, leaving everything outside its own block alone.
+
+It opens on request rather than living in the bar:
+
+```bash
+omarchy-shell shell summon ai.bkblab.displaywright '{}'
+```
+
+Worth a key. In `~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + P", "Displays", "omarchy-shell shell summon ai.bkblab.displaywright '{}'")
+```
+
+Escape closes it. This half needs nothing but Hyprland — it talks to `hyprctl`
+directly and does not care whether the wallpaper renderer is doing anything.
+
 ## Prefer clicking to editing JSON?
 
-The window that drives all of this — a picture library, a live preview of every
-fit, and a display arrangement editor — is a separate project:
+A window with a picture library and a live preview of every fit is a separate
+project:
 
 **https://github.com/BlackKingBarOrg/displaywright**
 

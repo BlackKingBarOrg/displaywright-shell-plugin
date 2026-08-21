@@ -18,6 +18,10 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons
+import "lib/geometry.mjs" as Geo
+import "lib/snapping.mjs" as Snap
+import "lib/luawriter.mjs" as Lua
 
 Item {
   id: root
@@ -26,6 +30,28 @@ Item {
   property string omarchyPath: ""
   property var shell: null
   property var manifest: null
+
+  // The arrangement overlay is mounted through the shell's Loader, and a
+  // component loaded that way resolves no imports of its own -- neither a
+  // script nor qs.Commons. A service is created synchronously and can, so this
+  // is where they are imported, and the overlay reads them off `service`.
+  //
+  // Everything reachable through here has to stay inside the JavaScript Qt's
+  // QML engine accepts. Object spread does not qualify: it takes this service
+  // down, and with it every wallpaper on the desktop.
+  readonly property var geo: Geo
+  readonly property var snap: Snap
+  readonly property var lua: Lua
+
+  //: A plain-value snapshot of the shell theme, for the same reason.
+  readonly property var palette: ({
+    background: Color.background, text: Color.text, muted: Color.muted,
+    placeholder: Color.placeholder, border: Color.border, active: Color.active,
+    accent: Color.accent, scrim: Color.scrim,
+    selectedBackground: Color.selectedBackground, selectedBorder: Color.selectedBorder,
+    selectedText: Color.selectedText, unselectedBorder: Color.unselectedBorder,
+    textError: Color.textError, countdown: Color.countdown,
+  })
 
   readonly property string home: Quickshell.env("HOME")
   readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")

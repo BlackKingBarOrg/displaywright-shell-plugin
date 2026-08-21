@@ -65,6 +65,7 @@ Item {
       id: tile
 
       required property int index
+      objectName: "tile-" + state.name
       readonly property var state: view.states[index]
       readonly property var rect: {
         if (view.controller) view.controller.revision
