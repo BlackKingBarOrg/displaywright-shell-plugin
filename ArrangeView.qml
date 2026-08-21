@@ -87,6 +87,7 @@ Item {
           Layout.fillHeight: true
           controller: view.controller
           pal: view.pal
+          popupLayer: popupLayer
         }
       }
 
@@ -192,6 +193,16 @@ Item {
           }
         }
       }
+    }
+
+    // Anything that has to escape the layouts is drawn here. `z` only orders
+    // siblings, so a list inside a sidebar row is covered by the rows beneath
+    // it however high its z -- it has to be reparented out to be on top.
+    Item {
+      id: popupLayer
+      objectName: "popupLayer"
+      anchors.fill: parent
+      z: 1000
     }
 
     focus: true

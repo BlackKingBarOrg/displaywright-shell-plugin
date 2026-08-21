@@ -8,6 +8,7 @@ Item {
 
   property var controller: null
   property var pal: null
+  property var popupLayer: null
   function c(role, fallback) { return pal && pal[role] !== undefined ? pal[role] : fallback }
   readonly property var geo: controller ? controller.geo : null
   readonly property var snap: controller ? controller.snap : null
@@ -103,6 +104,7 @@ Item {
             pal: sidebar.pal
       label: "Resolution"
       ArrangeSelect {
+            popupLayer: sidebar.popupLayer
             objectName: "resolution"
             pal: sidebar.pal
         options: sidebar.resolutions
@@ -129,6 +131,7 @@ Item {
             pal: sidebar.pal
       label: "Refresh"
       ArrangeSelect {
+            popupLayer: sidebar.popupLayer
             objectName: "refresh"
             pal: sidebar.pal
         options: sidebar.refreshRates.map(r => sidebar.geo.trimNumber(r) + " Hz")
@@ -152,6 +155,7 @@ Item {
       RowLayout {
         spacing: 6
         ArrangeSelect {
+            popupLayer: sidebar.popupLayer
             objectName: "scale"
             pal: sidebar.pal
           options: ["1", "1.25", "1.5", "1.75", "2", "2.5"]
@@ -170,6 +174,7 @@ Item {
             pal: sidebar.pal
       label: "Rotation"
       ArrangeSelect {
+            popupLayer: sidebar.popupLayer
             objectName: "rotation"
             pal: sidebar.pal
         options: sidebar.geo ? [0, 1, 2, 3].map(t => sidebar.geo.TRANSFORMS[t][0]) : []

@@ -266,10 +266,13 @@ TestCase {
     compare(control.open, true, controlName + " did not open")
     // The list virtualises, so a row far down it does not exist until the view
     // is scrolled to it -- which is what a user does too.
-    const listView = findChild(control, "listView")
+    // The list is drawn in the view's popup layer, not under the control, so
+    // it is searched from there. It virtualises too, so a row far down does
+    // not exist until the view is scrolled to it -- as a user would.
+    const listView = findChild(control.popup, "listView")
     listView.positionViewAtIndex(control.options.indexOf(option), ListView.Contain)
     wait(0)
-    const row = findChild(control, "option-" + option)
+    const row = findChild(control.popup, "option-" + option)
     verify(row !== null, "no row for " + option)
     mouseClick(row)
     compare(control.open, false, controlName + " stayed open after a pick")
@@ -284,10 +287,36 @@ TestCase {
     controller.touch()
     const control = find("resolution")
     compare(control.open, false)
-    compare(findChild(control, "list").visible, false, "the list showed before it was asked for")
+    compare(control.popup.visible, false, "the list showed before it was asked for")
     mouseClick(control)
     compare(control.open, true)
-    compare(findChild(control, "list").visible, true, "the list did not appear")
+    compare(control.popup.visible, true, "the list did not appear")
+  }
+
+  function test_the_list_is_drawn_above_everything_else() {
+    // z only orders siblings, so a list left inside a sidebar row is covered by
+    // the rows laid out after it however high its z. It has to be reparented
+    // into the layer the view draws last.
+    // The fixture panel advertises one size, and a control with one option does
+    // not open. Give it something to choose between first.
+    controller.states[0].availableModes = [
+      { width: 3200, height: 2000, refresh: 120 },
+      { width: 1920, height: 1200, refresh: 60 },
+    ]
+    controller.touch()
+
+    const control = find("resolution")
+    const layer = find("popupLayer")
+    verify(layer !== null, "the view has no popup layer")
+    compare(control.popup.parent, layer, "the list is not in the popup layer")
+
+    // And it has to land under its own field rather than at the layer origin.
+    mouseClick(control)
+    compare(control.open, true, "the control did not open")
+    const field = control.mapToItem(layer, 0, control.height)
+    verify(Math.abs(control.popup.y - (field.y + 4)) < 2,
+      "the list is not positioned under its control")
+    verify(Math.abs(control.popup.x - field.x) < 2)
   }
 
   function test_picking_a_resolution_changes_the_mode() {
@@ -368,5 +397,24 @@ TestCase {
     compare(controller.states[0].enabled, false)
     mouseClick(toggle)
     compare(controller.states[0].enabled, true)
+  }
+
+  function test_clicking_away_closes_the_list_without_reaching_what_is_behind() {
+    controller.states[0].availableModes = [
+      { width: 3200, height: 2000, refresh: 120 },
+      { width: 1920, height: 1200, refresh: 60 },
+    ]
+    controller.touch()
+    const control = find("resolution")
+    mouseClick(control)
+    compare(control.open, true)
+
+    const before = controller.selectedName
+    const layer = find("popupLayer")
+    // Somewhere well away from the list, over the canvas -- a click there must
+    // dismiss and stop, not also select a display.
+    mouseClick(layer, 60, layer.height - 60)
+    compare(control.open, false, "the list stayed open")
+    compare(controller.selectedName, before, "the dismissing click went through")
   }
 }

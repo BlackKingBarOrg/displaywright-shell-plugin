@@ -11,8 +11,13 @@ Item {
   id: select
 
   property var pal: null
+  //: An Item above the layouts to draw the list in. Without it the list is
+  //: covered by whatever is laid out after this control.
+  property var popupLayer: null
   property var options: []
   property string current: ""
+  //: The list, which lives in popupLayer rather than under this item.
+  readonly property alias popup: list
   property bool open: false
   signal picked(string value)
 
@@ -59,14 +64,34 @@ Item {
 
   // Above everything else in the sidebar, and tall enough for a real mode list
   // without running off the panel.
+  onOpenChanged: if (open) place()
+
+  //: Positioned once on opening: the panel does not move while a list is down,
+  //: and a binding through mapToItem would not re-evaluate when it did anyway.
+  function place() {
+    if (!list.parent || list.parent === select) return
+    var p = select.mapToItem(list.parent, 0, select.height + 4)
+    list.x = p.x
+    list.y = p.y
+  }
+
+  //: Catches the click that dismisses the list, so it neither stays open nor
+  //: lets the click through to the canvas behind it.
+  MouseArea {
+    objectName: "dismiss"
+    parent: select.popupLayer ? select.popupLayer : select
+    anchors.fill: parent
+    visible: select.open
+    z: 99
+    onClicked: select.open = false
+  }
+
   Rectangle {
     id: list
     objectName: "list"
+    parent: select.popupLayer ? select.popupLayer : select
     visible: select.open
     z: 100
-    anchors.top: field.bottom
-    anchors.topMargin: 4
-    anchors.left: field.left
     width: Math.max(select.width, 132)
     height: Math.min(view.contentHeight + 8, 216)
     radius: 8
