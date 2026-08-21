@@ -7,9 +7,11 @@
   "license": "MIT",
   "description": "A different wallpaper on each display, with every fit mode Windows has. Double-click a display to pick its own.",
   "kinds": [
-    "service"
+    "service",
+    "overlay"
   ],
   "entryPoints": {
-    "service": "Wallpaper.qml"
+    "service": "Wallpaper.qml",
+    "overlay": "Overlay.qml"
   }
 }
