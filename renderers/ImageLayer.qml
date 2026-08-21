@@ -1,14 +1,21 @@
 // A still picture, placed the way Windows places one.
 //
+// Every fit's geometry comes from lib/fits.mjs, the same module the
+// arrangement overlay draws its preview from. That is deliberate: the fits used
+// to be computed twice, once in QML for the screen and once in Python for the
+// preview, and "the preview matches the screen" was a promise maintained by
+// hand. Now it is one function, and the arithmetic has tests.
+//
 // Two of the fits are defined in *device* pixels rather than layout pixels:
-// Center shows the file at its own resolution, and Tile repeats it at its own
+// Center shows the file at its own resolution and Tile repeats it at its own
 // resolution. On a scaled display those are not the same thing as the layout
-// coordinates everything else here uses, so both divide through by the
-// output's device pixel ratio -- without that, a 3200x2000 photo centred on
-// this 200%-scaled laptop panel would be drawn twice as large as the file is.
+// coordinates everything else uses, so both divide through by the output's
+// device pixel ratio -- without that, a 3200x2000 photo centred on a
+// 200%-scaled laptop panel would be drawn twice as large as the file is.
 
 import QtQuick
 import qs.Commons
+import "../lib/fits.mjs" as Fits
 
 Item {
   id: layer
@@ -28,6 +35,21 @@ Item {
   readonly property Image activeImage: tiling ? tileImage : plainImage
   readonly property bool ready: path.length === 0 || activeImage.status === Image.Ready
 
+  // The file's own pixel size, once it has been decoded. Zero until then, which
+  // fits.mjs treats as "nothing to place" and answers with the whole box.
+  readonly property real sourceWidth: plainImage.implicitWidth
+  readonly property real sourceHeight: plainImage.implicitHeight
+
+  // [x, y, w, h] for this fit, in this output's logical pixels.
+  readonly property var placement: {
+    if (fit === "span") {
+      return Fits.spanRect(sourceWidth, sourceHeight,
+                           spanGeometry.w, spanGeometry.h,
+                           spanGeometry.dx, spanGeometry.dy)
+    }
+    return Fits.fittedRect(fit, sourceWidth, sourceHeight, layer.width, layer.height, layer.dpr)
+  }
+
   clip: true
 
   Image {
@@ -40,39 +62,15 @@ Item {
     smooth: true
     mipmap: true
 
-    width: {
-      if (layer.fit === "span") return layer.spanGeometry.w
-      if (layer.fit === "center") return implicitWidth / layer.dpr
-      return layer.width
-    }
-    height: {
-      if (layer.fit === "span") return layer.spanGeometry.h
-      if (layer.fit === "center") return implicitHeight / layer.dpr
-      return layer.height
-    }
-    x: {
-      if (layer.fit === "span") return -layer.spanGeometry.dx
-      if (layer.fit === "center") return Math.round((layer.width - width) / 2)
-      return 0
-    }
-    y: {
-      if (layer.fit === "span") return -layer.spanGeometry.dy
-      if (layer.fit === "center") return Math.round((layer.height - height) / 2)
-      return 0
-    }
-
-    fillMode: {
-      switch (layer.fit) {
-      case "fit": return Image.PreserveAspectFit
-      case "stretch": return Image.Stretch
-      // Centre has already been given the exact size it wants, so there is
-      // nothing left for the fill mode to decide.
-      case "center": return Image.Stretch
-      // Fill and span both cover their box and crop the overflow; span's box
-      // is simply the whole desktop rather than this one output.
-      default: return Image.PreserveAspectCrop
-      }
-    }
+    // The rectangle is already exact, so there is nothing left for a fill mode
+    // to decide: stretching into a box of the right aspect ratio is the same
+    // picture PreserveAspectCrop would have drawn, minus a second opinion about
+    // where it goes.
+    fillMode: Image.Stretch
+    x: layer.placement[0]
+    y: layer.placement[1]
+    width: layer.placement[2]
+    height: layer.placement[3]
   }
 
   // Tiling repeats the file at its own resolution. The image is laid out at
