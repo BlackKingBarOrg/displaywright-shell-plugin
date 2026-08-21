@@ -182,20 +182,25 @@ TestCase {
 
   function tileFor(name) { return find("tile-" + name) }
 
+  // Events are addressed to the canvas, which does not move, rather than to the
+  // tile, which does. Aiming at a moving frame feeds the drag a delta that has
+  // already been partly applied -- the test then reports travel the user never
+  // asked for, and would have hidden the fix for the real version of the same
+  // mistake in the handler.
   function dragBy(name, dxLogical, dyLogical) {
     const tile = tileFor(name)
     verify(tile !== null, "no tile for " + name)
-    // Moving a display changes the bounding box, and with it the zoom the next
-    // drag is measured in, so this is read fresh every time.
-    const zoom = tile.parent.zoom
-    const cx = tile.width / 2
-    const cy = tile.height / 2
-    mousePress(tile, cx, cy)
+    const canvas = tile.parent
+    const zoom = canvas.zoom
+    const from = tile.mapToItem(canvas, tile.width / 2, tile.height / 2)
+    const toX = from.x + dxLogical * zoom
+    const toY = from.y + dyLogical * zoom
+    mousePress(canvas, from.x, from.y)
     // Two moves: one to start the drag, one to land it. A single event can be
     // taken for a click.
-    mouseMove(tile, cx + dxLogical * zoom / 2, cy + dyLogical * zoom / 2)
-    mouseMove(tile, cx + dxLogical * zoom, cy + dyLogical * zoom)
-    mouseRelease(tile, cx + dxLogical * zoom, cy + dyLogical * zoom)
+    mouseMove(canvas, (from.x + toX) / 2, (from.y + toY) / 2)
+    mouseMove(canvas, toX, toY)
+    mouseRelease(canvas, toX, toY)
   }
 
   function test_a_tile_exists_for_every_display() {
@@ -206,8 +211,9 @@ TestCase {
   function test_pressing_a_tile_selects_that_display() {
     compare(controller.selectedName, "eDP-1")
     const tile = tileFor("DP-1")
-    mousePress(tile, tile.width / 2, tile.height / 2)
-    mouseRelease(tile, tile.width / 2, tile.height / 2)
+    const p = tile.mapToItem(tile.parent, tile.width / 2, tile.height / 2)
+    mousePress(tile.parent, p.x, p.y)
+    mouseRelease(tile.parent, p.x, p.y)
     compare(controller.selectedName, "DP-1")
   }
 
@@ -438,5 +444,48 @@ TestCase {
     mouseClick(layer, 60, layer.height - 60)
     compare(control.open, false, "the list stayed open")
     compare(controller.selectedName, before, "the dismissing click went through")
+  }
+
+  function test_a_drag_moves_exactly_as_far_as_the_pointer() {
+    // The tile has to track the cursor: a 300 logical-pixel gesture moves the
+    // display 300 logical pixels, however many mouse events it arrives in.
+    // Measuring the delta per event against the *current* position instead of
+    // the position the drag started from compounds it, and a small gesture
+    // throws the display across the desk.
+    const tile = tileFor("DP-1")
+    const canvas = tile.parent
+    const zoom = canvas.zoom
+    const startX = controller.states[1].x
+    const from = tile.mapToItem(canvas, tile.width / 2, tile.height / 2)
+    const travel = 300 * zoom          // device pixels
+
+    mousePress(canvas, from.x, from.y)
+    // Ten small steps, the way a real gesture arrives.
+    for (let i = 1; i <= 10; i++) mouseMove(canvas, from.x + travel * i / 10, from.y)
+    mouseRelease(canvas, from.x + travel, from.y)
+
+    const moved = controller.states[1].x - startX
+    verify(Math.abs(moved - 300) < 25,
+      "a 300px gesture moved the display " + moved + "px")
+  }
+
+  function test_the_view_holds_still_while_a_display_is_being_dragged() {
+    // Dragging changes the bounding box, which changes the zoom, which moves
+    // every tile -- including the one under the cursor. The tile then does not
+    // track the pointer and the last 88 pixels of a gesture go somewhere else.
+    const tile = tileFor("DP-1")
+    const canvas = tile.parent
+    const from = tile.mapToItem(canvas, tile.width / 2, tile.height / 2)
+    const zoomBefore = canvas.zoom
+
+    mousePress(canvas, from.x, from.y)
+    mouseMove(canvas, from.x + 400, from.y + 200)
+    compare(canvas.zoom, zoomBefore, "the view rescaled mid-drag")
+    mouseMove(canvas, from.x + 800, from.y + 400)
+    compare(canvas.zoom, zoomBefore, "the view rescaled mid-drag")
+    mouseRelease(canvas, from.x + 800, from.y + 400)
+
+    // And picks the new layout up once the gesture is over.
+    verify(canvas.zoom !== zoomBefore, "the view never caught up with the move")
   }
 }

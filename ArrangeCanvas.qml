@@ -30,13 +30,35 @@ Item {
     return rects.length ? geo.boundingBox(rects) : { x: 0, y: 0, w: 1920, h: 1080 }
   }
 
-  readonly property real zoom: {
+  // Dragging a display changes the bounding box, which changes the zoom, which
+  // moves every tile including the one under the cursor -- so the tile does not
+  // track the pointer and the drag fights back. The transform is frozen for the
+  // length of a gesture and recomputed when it ends.
+  property bool interacting: false
+  property real heldZoom: 0
+  property real heldOriginX: 0
+  property real heldOriginY: 0
+
+  readonly property real liveZoom: {
     const usableW = Math.max(width - 2 * padding, 40)
     const usableH = Math.max(height - 2 * padding, 40)
     return Math.min(usableW / Math.max(box.w, 1), usableH / Math.max(box.h, 1), maxZoom)
   }
-  readonly property real originX: (width - box.w * zoom) / 2 - box.x * zoom
-  readonly property real originY: (height - box.h * zoom) / 2 - box.y * zoom
+  readonly property real liveOriginX: (width - box.w * liveZoom) / 2 - box.x * liveZoom
+  readonly property real liveOriginY: (height - box.h * liveZoom) / 2 - box.y * liveZoom
+
+  readonly property real zoom: interacting ? heldZoom : liveZoom
+  readonly property real originX: interacting ? heldOriginX : liveOriginX
+  readonly property real originY: interacting ? heldOriginY : liveOriginY
+
+  function holdView() {
+    heldZoom = liveZoom
+    heldOriginX = liveOriginX
+    heldOriginY = liveOriginY
+    interacting = true
+  }
+
+  function releaseView() { interacting = false }
 
   function toDeviceX(x) { return originX + x * zoom }
   function toDeviceY(y) { return originY + y * zoom }
@@ -128,27 +150,48 @@ Item {
       MouseArea {
         anchors.fill: parent
         cursorShape: Qt.OpenHandCursor
-        property real grabX: 0
-        property real grabY: 0
+
+        // Where the display was when the drag began, and where the pointer was
+        // in the canvas's own coordinates. Both have to be anchored: measuring
+        // each event against the *current* position compounds the movement,
+        // and measuring in the tile's coordinates measures against a frame
+        // that is itself moving. Together they turned a 300px gesture into
+        // 1555px of travel.
+        property real originX: 0
+        property real originY: 0
+        property real pressX: 0
+        property real pressY: 0
         property bool dragging: false
 
         onPressed: function (mouse) {
           view.controller.selectedName = tile.state.name
-          grabX = mouse.x
-          grabY = mouse.y
+          view.holdView()
+          originX = tile.state.x
+          originY = tile.state.y
+          var p = mapToItem(view, mouse.x, mouse.y)
+          pressX = p.x
+          pressY = p.y
           dragging = true
         }
-        onReleased: dragging = false
+
+        onReleased: {
+          dragging = false
+          view.releaseView()
+        }
 
         onPositionChanged: function (mouse) {
-          if (!dragging) return
-          const dx = (mouse.x - grabX) / view.zoom
-          const dy = (mouse.y - grabY) / view.zoom
-          if (!view.geo || !view.snap) return
-          const others = view.states.filter(s => s.name !== tile.state.name).map(view.geo.rectOf)
-          const wanted = { x: tile.state.x + dx, y: tile.state.y + dy,
-                           w: tile.rect.w, h: tile.rect.h }
-          const result = view.snap.snapAndResolve(wanted, others)
+          if (!dragging || !view.geo || !view.snap) return
+          var p = mapToItem(view, mouse.x, mouse.y)
+          var wanted = {
+            x: originX + (p.x - pressX) / view.zoom,
+            y: originY + (p.y - pressY) / view.zoom,
+            w: tile.rect.w,
+            h: tile.rect.h,
+          }
+          var others = view.states
+            .filter(function (s) { return s.name !== tile.state.name })
+            .map(view.geo.rectOf)
+          var result = view.snap.snapAndResolve(wanted, others)
           tile.state.x = result.x
           tile.state.y = result.y
           view.controller.touch()
