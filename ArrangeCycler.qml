@@ -14,21 +14,21 @@ Rectangle {
   implicitWidth: Math.max(72, label.implicitWidth + 22)
   implicitHeight: 30
   radius: 8
-  color: pal.active
-  border.color: pal.border
+  color: pal ? pal.active : "#242430"
+  border.color: pal ? pal.border : "#33333f"
   border.width: 1
 
   Text {
     id: label
     anchors.centerIn: parent
     text: cycler.current
-    color: pal.text
+    color: cycler.pal ? cycler.pal.text : "#e6e6ea"
     font.pixelSize: 13
   }
 
   MouseArea {
     anchors.fill: parent
-    enabled: cycler.options.length > 1
+    enabled: !!cycler.options && cycler.options.length > 1
     cursorShape: Qt.PointingHandCursor
     onClicked: {
       const i = cycler.options.indexOf(cycler.current)

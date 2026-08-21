@@ -11,6 +11,7 @@ Item {
 
   property var controller: null
   property var pal: null
+  function c(role, fallback) { return pal && pal[role] !== undefined ? pal[role] : fallback }
   readonly property var geo: controller ? controller.geo : null
   readonly property var snap: controller ? controller.snap : null
 
@@ -43,9 +44,9 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: 10
-    color: pal.selectedBackground
+    color: c("selectedBackground", "#25324a")
     opacity: 0.25
-    border.color: pal.border
+    border.color: c("border", "#33333f")
     border.width: 1
   }
 
@@ -53,7 +54,7 @@ Item {
     anchors.centerIn: parent
     visible: view.states.length === 0
     text: "No outputs reported by Hyprland"
-    color: pal.muted
+    color: c("muted", "#9a9aa6")
     font.pixelSize: 14
   }
 
@@ -78,9 +79,9 @@ Item {
       height: rect.h * view.zoom
 
       radius: Math.min(9, width / 6, height / 6)
-      color: !state.enabled ? pal.background
-        : (isSelected ? pal.selectedBackground : pal.active)
-      border.color: isSelected ? pal.selectedBorder : pal.unselectedBorder
+      color: !state.enabled ? c("background", "#16161d")
+        : (isSelected ? c("selectedBackground", "#25324a") : c("active", "#242430"))
+      border.color: isSelected ? c("selectedBorder", "#6aa3f0") : c("unselectedBorder", "#41414f")
       border.width: isSelected ? 3 : 1
       opacity: state.enabled ? 1 : 0.55
 
@@ -90,7 +91,7 @@ Item {
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
           text: tile.state.name
-          color: pal.text
+          color: c("text", "#e6e6ea")
           font.pixelSize: 14
           font.bold: true
         }
@@ -104,7 +105,7 @@ Item {
             const px = view.geo.pixelSizeRotated(tile.state)
             return px[0] + "×" + px[1]
           }
-          color: pal.muted
+          color: c("muted", "#9a9aa6")
           font.pixelSize: 11
         }
         Text {
@@ -118,7 +119,7 @@ Item {
             return "×" + view.geo.trimNumber(tile.state.scale)
               + " → " + Math.round(l[0]) + "×" + Math.round(l[1])
           }
-          color: pal.muted
+          color: c("muted", "#9a9aa6")
           font.pixelSize: 11
         }
       }

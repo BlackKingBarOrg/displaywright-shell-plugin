@@ -8,6 +8,7 @@ Item {
 
   property var controller: null
   property var pal: null
+  function c(role, fallback) { return pal && pal[role] !== undefined ? pal[role] : fallback }
   readonly property var geo: controller ? controller.geo : null
   readonly property var snap: controller ? controller.snap : null
   readonly property var state: controller ? controller.selected : null
@@ -46,7 +47,7 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: 10
-    color: pal.selectedBackground
+    color: c("selectedBackground", "#25324a")
     opacity: 0.18
   }
 
@@ -54,7 +55,7 @@ Item {
     anchors.centerIn: parent
     visible: !sidebar.ready
     text: "Select a display"
-    color: pal.muted
+    color: c("muted", "#9a9aa6")
     font.pixelSize: 13
   }
 
@@ -67,7 +68,7 @@ Item {
     Text {
       Layout.fillWidth: true
       text: sidebar.ready ? sidebar.geo.prettyName(sidebar.state) : ""
-      color: pal.text
+      color: c("text", "#e6e6ea")
       font.pixelSize: 15
       font.bold: true
       elide: Text.ElideRight
@@ -75,7 +76,7 @@ Item {
     Text {
       Layout.fillWidth: true
       text: sidebar.ready ? sidebar.geo.panelSummary(sidebar.state) : ""
-      color: pal.muted
+      color: c("muted", "#9a9aa6")
       font.pixelSize: 12
       elide: Text.ElideRight
     }
@@ -157,7 +158,7 @@ Item {
       label: "Rotation"
       ArrangeCycler {
             pal: sidebar.pal
-        options: [0, 1, 2, 3].map(t => sidebar.geo.TRANSFORMS[t][0])
+        options: sidebar.geo ? [0, 1, 2, 3].map(t => sidebar.geo.TRANSFORMS[t][0]) : []
         current: sidebar.ready ? sidebar.geo.TRANSFORMS[sidebar.state.transform][0] : ""
         onPicked: function (value) {
           sidebar.edit(s => {
@@ -174,7 +175,7 @@ Item {
       label: "Position"
       Text {
         text: sidebar.state ? `${sidebar.state.x}, ${sidebar.state.y}` : ""
-        color: pal.muted
+        color: c("muted", "#9a9aa6")
         font.pixelSize: 13
       }
     }
@@ -185,7 +186,7 @@ Item {
       Layout.fillWidth: true
       wrapMode: Text.WordWrap
       visible: text.length > 0
-      color: pal.textError
+      color: c("textError", "#f08a8a")
       font.pixelSize: 12
       text: sidebar.state ? (sidebar.geo.scaleWarning(sidebar.state) || "") : ""
     }
@@ -193,7 +194,7 @@ Item {
     Text {
       Layout.fillWidth: true
       wrapMode: Text.WordWrap
-      color: pal.placeholder
+      color: c("placeholder", "#6f6f7b")
       font.pixelSize: 11
       text: sidebar.state ? "rule: " + sidebar.geo.summary(sidebar.state) : ""
     }

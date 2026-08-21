@@ -1,15 +1,17 @@
-// The display arrangement, as an Omarchy overlay.
+// The display arrangement overlay: everything that has to touch Quickshell.
 //
-// Everything this draws is decided by lib/geometry.mjs and lib/snapping.mjs,
-// the same modules `node --test` exercises, so the awkward parts -- rotation,
-// fractional scales, snapping, what counts as a valid layout -- are tested
-// without a compositor in the room.
+// Deliberately thin. A plugin overlay is mounted through the shell's Loader,
+// and a component loaded that way resolves no imports of its own -- not
+// scripts, not qs.Commons -- so the logic modules and the theme arrive through
+// the `service` property the shell injects. Worse, the shell serves a cached
+// component for any file changed while it runs, so testing a change here costs
+// a full shell restart.
 //
-// The root has to be an Item: the shell mounts plugins through a Loader, which
-// cannot hold a Window. The PanelWindow lives inside it.
+// Both problems are contained by keeping this file small and putting the whole
+// interface in ArrangeView.qml, which is plain QtQuick and can be driven by
+// qmltestrunner against a fake controller, offscreen, with no shell involved.
 
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -20,7 +22,7 @@ Item {
   property string omarchyPath: ""
   property var shell: null
   property var manifest: null
-  //: The wallpaper service, injected by the shell. It owns the imports.
+  //: The wallpaper service. It owns the imports this file cannot make.
   property var service: null
 
   readonly property var geo: service ? service.geo : null
@@ -33,12 +35,9 @@ Item {
   }
 
   property bool opened: false
-  //: Desired layout, mutated by dragging and by the sidebar.
   property var states: []
-  //: What Hyprland last reported, for the dirty check and for reverting.
   property var liveStates: []
   property string selectedName: ""
-  //: Bumped whenever `states` is mutated in place, to re-run bindings.
   property int revision: 0
   property string busy: ""
   property string notice: ""
@@ -48,32 +47,34 @@ Item {
   readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")
   readonly property string monitorsPath: configHome + "/hypr/monitors.lua"
 
+  function touch() { revision += 1 }
+
   readonly property var selected: {
     revision
     if (!ready) return null
-    for (const s of states) if (s.name === selectedName) return s
+    for (var i = 0; i < states.length; i++) if (states[i].name === selectedName) return states[i]
     return null
   }
 
   readonly property bool dirty: {
     revision
-    if (!ready) return false
-    if (states.length !== liveStates.length) return true
-    for (const s of states) {
-      const live = liveStates.find(l => l.name === s.name)
-      if (!live || !geo.configEquals(s, live)) return true
+    if (!ready || states.length !== liveStates.length) return states.length !== liveStates.length
+    for (var i = 0; i < states.length; i++) {
+      var live = null
+      for (var j = 0; j < liveStates.length; j++) {
+        if (liveStates[j].name === states[i].name) { live = liveStates[j]; break }
+      }
+      if (!live || !geo.configEquals(states[i], live)) return true
     }
     return false
   }
 
   readonly property var problems: { revision; return ready ? snap.validate(states) : [] }
 
-  function touch() { revision += 1 }
-
-  // ------------------------------------------------------------- shell entry
+  // ------------------------------------------------------------ shell entry
 
   function open(payload) {
-    if (!root.ready) return
+    if (!ready) { console.warn("displaywright: the arrangement needs the renderer service"); return }
     reload()
     root.opened = true
   }
@@ -85,30 +86,30 @@ Item {
 
   // ------------------------------------------------------------------- hypr
 
-  function reload() {
-    readProc.running = true
-  }
+  function reload() { readProc.running = true }
 
   Process {
     id: readProc
     command: ["hyprctl", "-j", "monitors", "all"]
     stdout: StdioCollector {
       onStreamFinished: {
-        let parsed = []
-        try {
-          parsed = JSON.parse(text)
-        } catch (e) {
+        var parsed = []
+        try { parsed = JSON.parse(text) } catch (e) {
           root.notice = "Could not read monitors: " + e
           return
         }
-        const next = parsed.map(geo.stateFromHyprctl)
-        next.sort((a, b) => (Number(!a.enabled) - Number(!b.enabled))
-          || (a.x - b.x) || (a.y - b.y) || a.name.localeCompare(b.name))
+        var next = parsed.map(root.geo.stateFromHyprctl)
+        next.sort(function (a, b) {
+          return (Number(!a.enabled) - Number(!b.enabled)) || (a.x - b.x) || (a.y - b.y)
+            || a.name.localeCompare(b.name)
+        })
         root.states = next
-        root.liveStates = next.map(geo.copyState)
-        if (!next.some(s => s.name === root.selectedName)) {
-          const focused = next.find(s => s.focused)
-          root.selectedName = focused ? focused.name : (next.length ? next[0].name : "")
+        root.liveStates = next.map(root.geo.copyState)
+        var known = false
+        for (var i = 0; i < next.length; i++) if (next[i].name === root.selectedName) known = true
+        if (!known) {
+          var focused = next.filter(function (s) { return s.focused })
+          root.selectedName = focused.length ? focused[0].name : (next.length ? next[0].name : "")
         }
         root.touch()
       }
@@ -118,32 +119,39 @@ Item {
   // Hyprland 0.56 with a Lua config refuses `keyword` and wants `eval`; older
   // hyprlang builds have no `eval`. hyprctl exits 0 either way, so the reply
   // text is the only signal -- the fallback is chained in the shell.
+  property var snapshot: []
+
   Process {
     id: applyProc
-    property var snapshot: []
-    command: ["bash", "-c", ""]
-    onExited: function (code) {
+    command: ["true"]
+    onExited: {
       root.busy = ""
-      root.startCountdown()
+      if (root.countdown === 0 && root.opened) root.startCountdown()
     }
   }
 
-  function applyStates(list, onDone) {
-    const lua = list.map(lua.renderCall).join("; ")
-    const legacy = list.map(s => "keyword monitor " + lua.ruleArgs(s)).join(" ; ")
+  function applyStates(list) {
+    var luaText = list.map(root.lua.renderCall).join("; ")
+    var legacy = list.map(function (s) { return "keyword monitor " + root.lua.ruleArgs(s) }).join(" ; ")
     applyProc.command = ["bash", "-c",
       'out=$(hyprctl eval "$1" 2>&1); '
-      + 'case "${out,,}" in *error*|*"can\'t work"*|*"unknown request"*) '
+      + 'case "${out,,}" in *error*|*"can'"'"'t work"*|*"unknown request"*) '
       + 'hyprctl --batch "$2" >/dev/null 2>&1 ;; esac',
-      "displaywright", lua, legacy]
+      "displaywright", luaText, legacy]
     root.busy = "Applying — waiting for Hyprland…"
     applyProc.running = true
   }
 
   function apply() {
-    if (root.busy) return
-    applyProc.snapshot = root.liveStates.map(geo.copyState)
+    if (root.busy !== "" || !ready) return
+    root.snapshot = root.liveStates.map(root.geo.copyState)
     applyStates(root.states)
+  }
+
+  function autoArrange() {
+    if (!ready) return
+    root.snap.autoArrange(root.states)
+    root.touch()
   }
 
   // ------------------------------------------------------- keep or revert
@@ -159,14 +167,14 @@ Item {
     repeat: true
     onTriggered: {
       root.countdown -= 1
-      if (root.countdown <= 0) { countdownTimer.stop(); root.revert() }
+      if (root.countdown <= 0) root.revert()
     }
   }
 
   function keep() {
     countdownTimer.stop()
     root.countdown = 0
-    root.liveStates = root.states.map(geo.copyState)
+    root.liveStates = root.states.map(root.geo.copyState)
     root.touch()
     root.save()
   }
@@ -174,13 +182,10 @@ Item {
   function revert() {
     countdownTimer.stop()
     root.countdown = 0
-    const snapshot = applyProc.snapshot
-    if (snapshot && snapshot.length) {
-      root.states = snapshot.map(geo.copyState)
+    if (root.snapshot && root.snapshot.length) {
+      root.states = root.snapshot.map(root.geo.copyState)
       root.touch()
-      applyStates(snapshot)
-      countdownTimer.stop()
-      root.countdown = 0
+      applyStates(root.snapshot)
     }
     root.notice = "Reverted to the previous arrangement"
   }
@@ -195,20 +200,19 @@ Item {
   }
 
   function save() {
-    // Everything outside displaywright's own block survives, and a laptop
-    // panel switched off is written through Omarchy's toggle rather than as a
-    // rule nothing would ever remove.
-    let existing = ""
+    if (!ready) return
+    var existing = ""
     try { existing = monitorsFile.text() } catch (e) { existing = "" }
-    const next = lua.renderFile(existing, root.states, true)
-    monitorsFile.setText(next)
+    // Everything outside displaywright's own block survives, and a laptop panel
+    // switched off is written through Omarchy's toggle rather than as a rule
+    // nothing would ever remove.
+    monitorsFile.setText(root.lua.renderFile(existing, root.states, true))
     root.notice = "Saved to " + root.monitorsPath
   }
 
   // ----------------------------------------------------------------- surface
 
   PanelWindow {
-    id: window
     visible: root.opened
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
@@ -216,156 +220,10 @@ Item {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    Rectangle {
+    ArrangeView {
       anchors.fill: parent
-      color: pal.scrim
-      MouseArea { anchors.fill: parent; onClicked: root.hide() }
-    }
-
-    Rectangle {
-      id: panel
-      anchors.centerIn: parent
-      width: Math.min(parent.width - 80, 1180)
-      height: Math.min(parent.height - 80, 760)
-      radius: 14
-      color: pal.background
-      border.color: pal.border
-      border.width: 1
-      // Swallow clicks so they do not reach the scrim behind.
-      MouseArea { anchors.fill: parent }
-
-      ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 18
-        spacing: 12
-
-        RowLayout {
-          Layout.fillWidth: true
-          Text {
-            text: "Displays"
-            color: pal.text
-            font.pixelSize: 20
-            font.bold: true
-          }
-          Item { Layout.fillWidth: true }
-          Text {
-            text: root.busy || root.notice || (root.problems.length ? root.problems[0] : "")
-            color: root.problems.length ? pal.textError : pal.muted
-            font.pixelSize: 13
-            elide: Text.ElideRight
-            Layout.maximumWidth: 520
-          }
-        }
-
-        RowLayout {
-          Layout.fillWidth: true
-          Layout.fillHeight: true
-          spacing: 14
-
-          ArrangeCanvas {
-            pal: root.pal
-            id: canvas
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            controller: root
-            pal: root.pal
-          }
-
-          ArrangeSidebar {
-            pal: root.pal
-            Layout.preferredWidth: 320
-            Layout.fillHeight: true
-            controller: root
-            pal: root.pal
-          }
-        }
-
-        RowLayout {
-          Layout.fillWidth: true
-          spacing: 10
-
-          Text {
-            text: {
-              root.revision
-              const on = root.states.filter(s => s.enabled)
-              if (!on.length) return "nothing enabled"
-              const box = geo.boundingBox(on.map(geo.rectOf))
-              return `${on.length} display${on.length === 1 ? "" : "s"} · `
-                + `${Math.round(box.w)}×${Math.round(box.h)}`
-                + (root.dirty ? " · unapplied changes" : "")
-            }
-            color: pal.muted
-            font.pixelSize: 13
-          }
-          Item { Layout.fillWidth: true }
-
-          ArrangeButton {
-            pal: root.pal
-            label: "Auto arrange"
-            onTriggered: { snap.autoArrange(root.states); root.touch() }
-          }
-          ArrangeButton {
-            pal: root.pal
-            label: "Close"
-            onTriggered: root.hide()
-          }
-          ArrangeButton {
-            pal: root.pal
-            label: "Apply"
-            primary: true
-            enabled: root.dirty && root.busy === ""
-            onTriggered: root.apply()
-          }
-        }
-      }
-
-      // Keep-or-revert, defaulting to revert: a display that went black cannot
-      // lock anybody out while this is on screen.
-      Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        color: pal.scrim
-        visible: root.countdown > 0
-
-        Rectangle {
-          anchors.centerIn: parent
-          width: 460
-          height: 150
-          radius: 12
-          color: pal.background
-          border.color: pal.countdown
-          border.width: 2
-
-          ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 18
-            spacing: 12
-            Text {
-              text: "Keep this arrangement?"
-              color: pal.text
-              font.pixelSize: 17
-              font.bold: true
-            }
-            Text {
-              Layout.fillWidth: true
-              wrapMode: Text.WordWrap
-              color: pal.muted
-              font.pixelSize: 13
-              text: `Reverting in ${root.countdown}s if you do not confirm, and saving to `
-                + "monitors.lua if you do."
-            }
-            RowLayout {
-              Layout.fillWidth: true
-              Item { Layout.fillWidth: true }
-              ArrangeButton { label: "Revert"; onTriggered: root.revert() }
-              ArrangeButton { label: "Keep"; primary: true; onTriggered: root.keep() }
-            }
-          }
-        }
-      }
-
-      focus: root.opened
-      Keys.onEscapePressed: root.countdown > 0 ? root.revert() : root.hide()
+      controller: root
+      pal: root.pal
     }
   }
 }

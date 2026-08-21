@@ -14,15 +14,16 @@ Rectangle {
   implicitHeight: 32
   radius: 8
   opacity: enabled ? 1 : 0.4
-  color: primary ? pal.accent : pal.active
-  border.color: primary ? pal.accent : pal.border
+  color: pal ? (primary ? pal.accent : pal.active) : (primary ? "#3584e4" : "#242430")
+  border.color: pal ? (primary ? pal.accent : pal.border) : "#33333f"
   border.width: 1
 
   Text {
     id: text
     anchors.centerIn: parent
     text: button.label
-    color: button.primary ? pal.selectedText : pal.text
+    color: button.pal ? (button.primary ? button.pal.selectedText : button.pal.text)
+      : (button.primary ? "#ffffff" : "#e6e6ea")
     font.pixelSize: 13
   }
 

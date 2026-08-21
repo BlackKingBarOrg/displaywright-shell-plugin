@@ -12,7 +12,7 @@ RowLayout {
 
   Text {
     text: parent.label
-    color: pal.muted
+    color: parent.pal ? parent.pal.muted : "#9a9aa6"
     font.pixelSize: 13
     Layout.preferredWidth: 84
   }
