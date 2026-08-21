@@ -243,4 +243,130 @@ TestCase {
     compare(controller.dirty, true, "a drag did not register as a change")
     verify(find("apply").enabled)
   }
+
+  // --------------------------------------------------------------- sidebar
+  //
+  // The per-display controls had no coverage at all, which is how a resolution
+  // picker that does nothing reached a real desktop.
+
+  function test_the_sidebar_offers_every_resolution_the_panel_has() {
+    const cycler = find("resolution")
+    verify(cycler !== null, "no resolution control")
+    // The fixture advertises one size; a real panel advertises many. Either
+    // way the control has to show what the display is currently running.
+    compare(cycler.current, "3200x2000")
+  }
+
+  function pick(controlName, option) {
+    const control = find(controlName)
+    verify(control !== null, "no " + controlName + " control")
+    verify(control.options.indexOf(option) !== -1,
+      option + " is not offered by " + controlName + ": " + JSON.stringify(control.options))
+    mouseClick(control)                       // open the list
+    compare(control.open, true, controlName + " did not open")
+    // The list virtualises, so a row far down it does not exist until the view
+    // is scrolled to it -- which is what a user does too.
+    const listView = findChild(control, "listView")
+    listView.positionViewAtIndex(control.options.indexOf(option), ListView.Contain)
+    wait(0)
+    const row = findChild(control, "option-" + option)
+    verify(row !== null, "no row for " + option)
+    mouseClick(row)
+    compare(control.open, false, controlName + " stayed open after a pick")
+  }
+
+  function test_a_control_opens_a_list_rather_than_cycling() {
+    const s = controller.states[0]
+    s.availableModes = [
+      { width: 3200, height: 2000, refresh: 120 },
+      { width: 1920, height: 1200, refresh: 60 },
+    ]
+    controller.touch()
+    const control = find("resolution")
+    compare(control.open, false)
+    compare(findChild(control, "list").visible, false, "the list showed before it was asked for")
+    mouseClick(control)
+    compare(control.open, true)
+    compare(findChild(control, "list").visible, true, "the list did not appear")
+  }
+
+  function test_picking_a_resolution_changes_the_mode() {
+    const s = controller.states[0]
+    s.availableModes = [
+      { width: 3200, height: 2000, refresh: 120 },
+      { width: 1920, height: 1200, refresh: 60 },
+    ]
+    controller.touch()
+    pick("resolution", "1920x1200")
+    compare(controller.states[0].mode.width, 1920, "picking did not change the mode")
+    compare(controller.states[0].mode.height, 1200)
+  }
+
+  function test_a_long_mode_list_is_reachable_in_one_pick() {
+    // A real panel offers eleven sizes. Cycling to the last one took eleven
+    // clicks and showed a stale value the whole way; a list takes two.
+    const s = controller.states[0]
+    s.availableModes = []
+    for (const r of [[3200,2000],[2560,1440],[1920,1200],[1920,1080],[1680,1050],
+                     [1600,900],[1440,900],[1366,768],[1280,1024],[1280,720],[1024,768]]) {
+      s.availableModes.push({ width: r[0], height: r[1], refresh: 60 })
+    }
+    controller.touch()
+    compare(find("resolution").options.length, 11)
+    pick("resolution", "1024x768")
+    compare(controller.states[0].mode.width, 1024)
+  }
+
+  function test_picking_a_refresh_rate_changes_the_mode() {
+    const s = controller.states[0]
+    s.availableModes = [
+      { width: 3200, height: 2000, refresh: 120 },
+      { width: 3200, height: 2000, refresh: 60 },
+    ]
+    s.mode = { width: 3200, height: 2000, refresh: 120 }
+    controller.touch()
+    pick("refresh", "60 Hz")
+    compare(controller.states[0].mode.refresh, 60)
+  }
+
+  function test_cycling_the_scale_changes_it() {
+    compare(controller.states[0].scale, 2)
+    pick("scale", "1.25")
+    compare(controller.states[0].scale, 1.25)
+  }
+
+  function test_every_control_shows_what_the_display_is_actually_set_to() {
+    // QML does not track fields of a plain object, so a binding that forgets to
+    // depend on the revision counter goes stale. A control showing a stale
+    // value then cycles from the wrong place and lands back where it started,
+    // which reads as a control that does nothing at all -- and did.
+    const s = controller.states[0]
+    s.mode = { width: 3200, height: 2000, refresh: 60 }
+    s.scale = 1.5
+    s.transform = 2
+    s.enabled = false
+    controller.touch()
+
+    compare(find("resolution").current, "3200x2000")
+    compare(find("refresh").current, "60 Hz")
+    compare(find("scale").current, "1.5")
+    compare(find("rotation").current, "180°")
+    compare(find("enabled").label, "Off")
+  }
+
+  function test_rotating_marks_the_layout_unapplied() {
+    compare(controller.states[0].transform, 0)
+    pick("rotation", "90°")
+    compare(controller.states[0].transform, 1, "rotation did not change")
+    compare(controller.dirty, true)
+  }
+
+  function test_toggling_enabled_turns_a_display_off_and_on() {
+    const toggle = find("enabled")
+    verify(toggle !== null)
+    mouseClick(toggle)
+    compare(controller.states[0].enabled, false)
+    mouseClick(toggle)
+    compare(controller.states[0].enabled, true)
+  }
 }

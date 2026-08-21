@@ -11,7 +11,10 @@ Item {
   function c(role, fallback) { return pal && pal[role] !== undefined ? pal[role] : fallback }
   readonly property var geo: controller ? controller.geo : null
   readonly property var snap: controller ? controller.snap : null
-  readonly property var state: controller ? controller.selected : null
+  //: Every binding below reads mutable fields off plain objects, which QML
+  //: does not track. Touching this is what makes them re-evaluate.
+  readonly property int rev: controller ? controller.revision : 0
+  readonly property var state: { rev; return controller ? controller.selected : null }
   readonly property bool ready: !!(state && geo)
 
   function edit(fn) {
@@ -67,7 +70,7 @@ Item {
 
     Text {
       Layout.fillWidth: true
-      text: sidebar.ready ? sidebar.geo.prettyName(sidebar.state) : ""
+      text: { sidebar.rev; return sidebar.ready ? sidebar.geo.prettyName(sidebar.state) : "" }
       color: c("text", "#e6e6ea")
       font.pixelSize: 15
       font.bold: true
@@ -75,7 +78,7 @@ Item {
     }
     Text {
       Layout.fillWidth: true
-      text: sidebar.ready ? sidebar.geo.panelSummary(sidebar.state) : ""
+      text: { sidebar.rev; return sidebar.ready ? sidebar.geo.panelSummary(sidebar.state) : "" }
       color: c("muted", "#9a9aa6")
       font.pixelSize: 12
       elide: Text.ElideRight
@@ -85,9 +88,10 @@ Item {
             pal: sidebar.pal
       label: "Enabled"
       ArrangeButton {
+            objectName: "enabled"
             pal: sidebar.pal
-        label: sidebar.state && sidebar.state.enabled ? "On" : "Off"
-        primary: !!(sidebar.state && sidebar.state.enabled)
+        label: { sidebar.rev; return sidebar.state && sidebar.state.enabled ? "On" : "Off" }
+        primary: { sidebar.rev; return !!(sidebar.state && sidebar.state.enabled) }
         onTriggered: sidebar.edit(s => {
           s.enabled = !s.enabled
           if (s.enabled && !s.mode && s.availableModes.length) s.mode = sidebar.geo.preferredMode(s)
@@ -98,11 +102,15 @@ Item {
     ArrangeRow {
             pal: sidebar.pal
       label: "Resolution"
-      ArrangeCycler {
+      ArrangeSelect {
+            objectName: "resolution"
             pal: sidebar.pal
         options: sidebar.resolutions
-        current: sidebar.state && sidebar.state.mode
-          ? sidebar.geo.modeResolution(sidebar.state.mode) : "preferred"
+        current: {
+          sidebar.rev
+          return sidebar.state && sidebar.state.mode
+            ? sidebar.geo.modeResolution(sidebar.state.mode) : "preferred"
+        }
         onPicked: function (value) {
           sidebar.edit(s => {
             const [w, h] = value.split("x").map(Number)
@@ -120,11 +128,15 @@ Item {
     ArrangeRow {
             pal: sidebar.pal
       label: "Refresh"
-      ArrangeCycler {
+      ArrangeSelect {
+            objectName: "refresh"
             pal: sidebar.pal
         options: sidebar.refreshRates.map(r => sidebar.geo.trimNumber(r) + " Hz")
-        current: sidebar.state && sidebar.state.mode && sidebar.state.mode.refresh
-          ? sidebar.geo.trimNumber(sidebar.state.mode.refresh) + " Hz" : "—"
+        current: {
+          sidebar.rev
+          return sidebar.state && sidebar.state.mode && sidebar.state.mode.refresh
+            ? sidebar.geo.trimNumber(sidebar.state.mode.refresh) + " Hz" : "—"
+        }
         onPicked: function (value) {
           sidebar.edit(s => {
             const rate = parseFloat(value)
@@ -139,10 +151,11 @@ Item {
       label: "Scale"
       RowLayout {
         spacing: 6
-        ArrangeCycler {
+        ArrangeSelect {
+            objectName: "scale"
             pal: sidebar.pal
           options: ["1", "1.25", "1.5", "1.75", "2", "2.5"]
-          current: sidebar.ready ? sidebar.geo.trimNumber(sidebar.state.scale) : ""
+          current: { sidebar.rev; return sidebar.ready ? sidebar.geo.trimNumber(sidebar.state.scale) : "" }
           onPicked: function (value) { sidebar.edit(s => { s.scale = parseFloat(value) }) }
         }
         ArrangeButton {
@@ -156,10 +169,11 @@ Item {
     ArrangeRow {
             pal: sidebar.pal
       label: "Rotation"
-      ArrangeCycler {
+      ArrangeSelect {
+            objectName: "rotation"
             pal: sidebar.pal
         options: sidebar.geo ? [0, 1, 2, 3].map(t => sidebar.geo.TRANSFORMS[t][0]) : []
-        current: sidebar.ready ? sidebar.geo.TRANSFORMS[sidebar.state.transform][0] : ""
+        current: { sidebar.rev; return sidebar.ready ? sidebar.geo.TRANSFORMS[sidebar.state.transform][0] : "" }
         onPicked: function (value) {
           sidebar.edit(s => {
             for (const t of [0, 1, 2, 3, 4, 5, 6, 7]) {
@@ -174,7 +188,7 @@ Item {
             pal: sidebar.pal
       label: "Position"
       Text {
-        text: sidebar.state ? `${sidebar.state.x}, ${sidebar.state.y}` : ""
+        text: { sidebar.rev; return sidebar.state ? sidebar.state.x + ", " + sidebar.state.y : "" }
         color: c("muted", "#9a9aa6")
         font.pixelSize: 13
       }
@@ -188,7 +202,7 @@ Item {
       visible: text.length > 0
       color: c("textError", "#f08a8a")
       font.pixelSize: 12
-      text: sidebar.state ? (sidebar.geo.scaleWarning(sidebar.state) || "") : ""
+      text: { sidebar.rev; return sidebar.ready ? (sidebar.geo.scaleWarning(sidebar.state) || "") : "" }
     }
 
     Text {
@@ -196,7 +210,7 @@ Item {
       wrapMode: Text.WordWrap
       color: c("placeholder", "#6f6f7b")
       font.pixelSize: 11
-      text: sidebar.state ? "rule: " + sidebar.geo.summary(sidebar.state) : ""
+      text: { sidebar.rev; return sidebar.ready ? "rule: " + sidebar.geo.summary(sidebar.state) : "" }
     }
   }
 }

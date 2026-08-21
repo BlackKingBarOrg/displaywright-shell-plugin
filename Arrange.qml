@@ -133,10 +133,16 @@ Item {
   function applyStates(list) {
     var luaText = list.map(root.lua.renderCall).join("; ")
     var legacy = list.map(function (s) { return "keyword monitor " + root.lua.ruleArgs(s) }).join(" ; ")
+    // Matched against the reply text because hyprctl exits 0 either way. The
+    // phrases are the ones it refuses with; "non-legacy" stands in for "can't
+    // work with non-legacy parsers" so this string needs no apostrophe, which
+    // would have to be escaped twice over and reads worse than it matches.
     applyProc.command = ["bash", "-c",
-      'out=$(hyprctl eval "$1" 2>&1); '
-      + 'case "${out,,}" in *error*|*"can'"'"'t work"*|*"unknown request"*) '
-      + 'hyprctl --batch "$2" >/dev/null 2>&1 ;; esac',
+      'out=$(hyprctl eval "$1" 2>&1); low=${out,,}; '
+      + 'case "$low" in '
+      + '*error*|*non-legacy*|*"unknown request"*|*"invalid dispatcher"*) '
+      + 'hyprctl --batch "$2" >/dev/null 2>&1 ;; '
+      + 'esac',
       "displaywright", luaText, legacy]
     root.busy = "Applying — waiting for Hyprland…"
     applyProc.running = true
