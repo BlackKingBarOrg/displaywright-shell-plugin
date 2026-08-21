@@ -131,12 +131,22 @@ entry costs you that wallpaper, never your desktop. `journalctl --user -u
 omarchy-shell` (or wherever your shell logs) carries a `displaywright:` line
 saying which one.
 
-## Arranging your displays
+## The arrangement window
 
-The plugin also carries a display arrangement editor: drag your outputs into
-place, set resolution, refresh rate, scale and rotation, apply it live, and keep
-or revert with a fifteen-second countdown that defaults to revert — so a display
-that goes black cannot lock you out. Keeping it writes the layout to
+One overlay for where your displays are and what is on them: drag the outputs
+into place, set resolution, refresh rate, scale and rotation, and pick a
+wallpaper for whichever display is selected from the strip along the bottom.
+Each display is drawn with the picture it is actually set to, so the
+arrangement doubles as the preview.
+
+**Add…** brings in a file from anywhere through the desktop file chooser and
+copies it into `~/Pictures/Displaywright`, so the wallpaper survives you
+emptying `~/Downloads`. **Follow theme** hands a display back to the Omarchy
+theme background.
+
+Applying a layout takes effect immediately and then asks to keep or revert with
+a fifteen-second countdown that defaults to revert — a display that goes black
+cannot lock you out. Keeping it writes the layout to
 `~/.config/hypr/monitors.lua`, leaving everything outside its own block alone.
 
 It opens on request rather than living in the bar:

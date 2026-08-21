@@ -46,6 +46,9 @@ Item {
   readonly property string home: Quickshell.env("HOME")
   readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")
   readonly property string monitorsPath: configHome + "/hypr/monitors.lua"
+  //: Where this plugin was loaded from, for the scripts shipped beside it.
+  readonly property string pluginDir: manifest && manifest.__sourceDir
+    ? String(manifest.__sourceDir) : ""
 
   function touch() { revision += 1 }
 
@@ -76,6 +79,8 @@ Item {
   function open(payload) {
     if (!ready) { console.warn("displaywright: the arrangement needs the renderer service"); return }
     reload()
+    loadWallpapers()
+    listWallpapersProc.running = true
     root.opened = true
   }
 
@@ -194,6 +199,101 @@ Item {
       applyStates(root.snapshot)
     }
     root.notice = "Reverted to the previous arrangement"
+  }
+
+  // -------------------------------------------------------------- wallpapers
+
+  readonly property string wallpapersPath: configHome + "/displaywright/wallpapers.json"
+  property var wallpapers: ({ version: 1, monitors: {} })
+  property var wallpaperFiles: []
+  property int wallpaperRevision: 0
+
+  function wallpaperFor(name) {
+    wallpaperRevision
+    if (!name || !wallpapers.monitors) return ""
+    var entry = wallpapers.monitors[name]
+    return entry && entry.path ? String(entry.path) : ""
+  }
+
+  FileView {
+    id: wallpapersFile
+    path: root.wallpapersPath
+    printErrors: false
+    blockLoading: true
+  }
+
+  function loadWallpapers() {
+    var parsed = { version: 1, monitors: {} }
+    try {
+      var text = wallpapersFile.text()
+      if (text && text.trim().length) {
+        var raw = JSON.parse(text)
+        if (raw && typeof raw === "object") {
+          parsed = raw
+          if (!parsed.monitors || typeof parsed.monitors !== "object") parsed.monitors = {}
+        }
+      }
+    } catch (e) {
+      // A hand-mangled config costs the user their wallpapers for a moment,
+      // not the arrangement they came here to change.
+      console.warn("displaywright: could not read " + root.wallpapersPath + ": " + e)
+    }
+    root.wallpapers = parsed
+    root.wallpaperRevision += 1
+  }
+
+  function saveWallpapers() {
+    wallpapersFile.setText(JSON.stringify(root.wallpapers, null, 2) + "\n")
+    root.wallpaperRevision += 1
+  }
+
+  function setWallpaper(path) {
+    if (!root.selectedName || !path) return
+    var monitors = root.wallpapers.monitors || {}
+    var entry = monitors[root.selectedName] || {}
+    entry.kind = "image"
+    entry.path = String(path)
+    if (!entry.fit) entry.fit = "fill"
+    monitors[root.selectedName] = entry
+    root.wallpapers.monitors = monitors
+    // A span covers every display and outranks the per-display entries, so
+    // leaving one set would make this pick look like it did nothing.
+    if (root.wallpapers.span) delete root.wallpapers.span
+    saveWallpapers()
+  }
+
+  function clearWallpaper() {
+    if (!root.selectedName || !root.wallpapers.monitors) return
+    delete root.wallpapers.monitors[root.selectedName]
+    saveWallpapers()
+  }
+
+  Process {
+    id: listWallpapersProc
+    command: [root.pluginDir + "/list-wallpapers.sh"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var lines = String(text || "").split("\n").filter(function (l) { return l.length > 0 })
+        root.wallpaperFiles = lines
+      }
+    }
+  }
+
+  Process {
+    id: addWallpaperProc
+    command: [root.pluginDir + "/add-wallpaper.sh"]
+    stdout: StdioCollector {
+      onStreamFinished: {
+        var picked = String(text || "").trim()
+        if (!picked.length) return
+        listWallpapersProc.running = true
+        root.setWallpaper(picked)
+      }
+    }
+  }
+
+  function addWallpaper() {
+    if (!addWallpaperProc.running) addWallpaperProc.running = true
   }
 
   // -------------------------------------------------------------- persisting

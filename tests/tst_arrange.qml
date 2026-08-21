@@ -52,6 +52,38 @@ TestCase {
       property int keepCalls: 0
       property int revertCalls: 0
 
+      // The wallpaper half. Writes are recorded rather than made.
+      property var wallpapers: ({ version: 1, monitors: {} })
+      property var wallpaperFiles: []
+      property int wallpaperRevision: 0
+      property int addCalls: 0
+      property int saveCalls: 0
+
+      function wallpaperFor(name) {
+        wallpaperRevision
+        if (!name || !wallpapers.monitors) return ""
+        var entry = wallpapers.monitors[name]
+        return entry && entry.path ? String(entry.path) : ""
+      }
+      function setWallpaper(path) {
+        if (!selectedName || !path) return
+        var m = wallpapers.monitors || {}
+        var e = m[selectedName] || {}
+        e.kind = "image"; e.path = String(path); if (!e.fit) e.fit = "fill"
+        m[selectedName] = e
+        wallpapers.monitors = m
+        if (wallpapers.span) delete wallpapers.span
+        saveCalls += 1
+        wallpaperRevision += 1
+      }
+      function clearWallpaper() {
+        if (!selectedName || !wallpapers.monitors) return
+        delete wallpapers.monitors[selectedName]
+        saveCalls += 1
+        wallpaperRevision += 1
+      }
+      function addWallpaper() { addCalls += 1 }
+
       function touch() { revision += 1 }
       function hide() { hidden = true }
       function apply() { applyCalls += 1 }
@@ -89,6 +121,7 @@ TestCase {
     controller.states = [monitor("eDP-1", 3200, 2000, 0, 0, 2), monitor("DP-1", 2560, 1440, 1600, 0)]
     controller.liveStates = controller.states.map(Geo.copyState)
     controller.selectedName = "eDP-1"
+    controller.wallpaperFiles = ["/pic/one.png", "/pic/two.png", "/pic/three.png"]
     view = viewComp.createObject(suite, {
       controller: controller,
       pal: paletteComp.createObject(suite),
@@ -487,5 +520,72 @@ TestCase {
 
     // And picks the new layout up once the gesture is over.
     verify(canvas.zoom !== zoomBefore, "the view never caught up with the move")
+  }
+
+  // ------------------------------------------------------------ wallpapers
+
+  function test_the_strip_lists_every_picture_it_was_given() {
+    const list = find("wallpaperList")
+    verify(list !== null, "no wallpaper strip")
+    compare(list.count, 3)
+    compare(list.orientation, ListView.Horizontal, "the strip is not horizontal")
+  }
+
+  function test_choosing_a_picture_gives_it_to_the_selected_display_only() {
+    compare(controller.selectedName, "eDP-1")
+    const row = findChild(find("wallpaperList"), "wallpaper-two.png")
+    verify(row !== null, "no tile for two.png")
+    mouseClick(row)
+    compare(controller.wallpaperFor("eDP-1"), "/pic/two.png")
+    compare(controller.wallpaperFor("DP-1"), "", "the other display was touched")
+  }
+
+  function test_the_preview_shows_the_wallpaper_a_display_was_given() {
+    controller.setWallpaper("/pic/one.png")
+    const tile = tileFor("eDP-1")
+    // The tile's Image is bound to wallpaperFor, and a binding that forgets the
+    // revision counter goes stale exactly the way the sidebar's did.
+    var found = false
+    for (var i = 0; i < tile.children.length; i++) {
+      var child = tile.children[i]
+      if (child.source !== undefined && String(child.source).indexOf("one.png") !== -1) found = true
+    }
+    verify(found, "the tile does not show the wallpaper it was given")
+  }
+
+  function test_switching_display_switches_what_the_strip_highlights() {
+    controller.setWallpaper("/pic/one.png")          // eDP-1
+    controller.selectedName = "DP-1"
+    controller.setWallpaper("/pic/three.png")
+    compare(controller.wallpaperFor("eDP-1"), "/pic/one.png")
+    compare(controller.wallpaperFor("DP-1"), "/pic/three.png")
+  }
+
+  function test_follow_theme_hands_the_display_back() {
+    controller.setWallpaper("/pic/one.png")
+    const follow = find("followTheme")
+    verify(follow !== null, "no follow-theme control")
+    verify(follow.enabled, "offered nothing to undo")
+    mouseClick(follow)
+    compare(controller.wallpaperFor("eDP-1"), "")
+  }
+
+  function test_follow_theme_is_dead_when_the_display_already_follows_it() {
+    compare(controller.wallpaperFor("eDP-1"), "")
+    compare(find("followTheme").enabled, false)
+  }
+
+  function test_add_reaches_the_file_picker() {
+    mouseClick(find("addWallpaper"))
+    compare(controller.addCalls, 1)
+  }
+
+  function test_choosing_a_picture_ends_a_span() {
+    // A span outranks the per-display entries, so writing one under it would
+    // look like the pick did nothing at all.
+    controller.wallpapers.span = { kind: "image", path: "/pic/wide.png" }
+    controller.setWallpaper("/pic/two.png")
+    compare(controller.wallpapers.span, undefined, "the span survived the pick")
+    compare(controller.wallpaperFor("eDP-1"), "/pic/two.png")
   }
 }

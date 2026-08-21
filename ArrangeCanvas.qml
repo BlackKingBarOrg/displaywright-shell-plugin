@@ -107,6 +107,27 @@ Item {
       border.color: isSelected ? c("selectedBorder", "#6aa3f0") : c("unselectedBorder", "#41414f")
       border.width: isSelected ? 3 : 1
       opacity: state.enabled ? 1 : 0.55
+      clip: true
+
+      //: The wallpaper this display is set to, drawn the way it will be drawn.
+      //: Cropped to fill, which is the default and what all but one of the fits
+      //: look like at this size.
+      Image {
+        anchors.fill: parent
+        anchors.margins: tile.border.width
+        visible: source != "" && tile.state.enabled
+        source: {
+          if (view.controller) view.controller.wallpaperRevision
+          var path = view.controller ? view.controller.wallpaperFor(tile.state.name) : ""
+          return path.length ? "file://" + path : ""
+        }
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        cache: true
+        sourceSize.width: 480      // a strip of 4K files decoded at full size
+        sourceSize.height: 300     // is hundreds of megabytes for no gain
+        opacity: 0.85              // let the tile's selection colour through
+      }
 
       Column {
         anchors.centerIn: parent

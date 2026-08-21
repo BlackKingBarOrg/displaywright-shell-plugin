@@ -91,6 +91,12 @@ Item {
         }
       }
 
+      ArrangeWallpapers {
+        Layout.fillWidth: true
+        controller: view.controller
+        pal: view.pal
+      }
+
       RowLayout {
         Layout.fillWidth: true
         spacing: 10
