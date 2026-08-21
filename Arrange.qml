@@ -35,6 +35,11 @@ Item {
   }
 
   property bool opened: false
+  //: Stood down while something else needs the screen. The file chooser is an
+  //: ordinary window, and an ordinary window renders *below* a layer-shell
+  //: overlay -- so a dialog opened from here would be invisible behind this
+  //: panel, and unusable besides, since this holds keyboard focus exclusively.
+  property bool suspended: false
   property var states: []
   property var liveStates: []
   property string selectedName: ""
@@ -282,6 +287,9 @@ Item {
   Process {
     id: addWallpaperProc
     command: [root.pluginDir + "/add-wallpaper.sh"]
+    // Come back whatever happened: a cancelled chooser and a failed one both
+    // have to give the panel its screen back.
+    onExited: root.suspended = false
     stdout: StdioCollector {
       onStreamFinished: {
         var picked = String(text || "").trim()
@@ -293,7 +301,9 @@ Item {
   }
 
   function addWallpaper() {
-    if (!addWallpaperProc.running) addWallpaperProc.running = true
+    if (addWallpaperProc.running) return
+    root.suspended = true
+    addWallpaperProc.running = true
   }
 
   // -------------------------------------------------------------- persisting
@@ -319,12 +329,13 @@ Item {
   // ----------------------------------------------------------------- surface
 
   PanelWindow {
-    visible: root.opened
+    visible: root.opened && !root.suspended
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     WlrLayershell.namespace: "displaywright-arrange"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: root.opened && !root.suspended
+      ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     ArrangeView {
       anchors.fill: parent

@@ -58,6 +58,7 @@ TestCase {
       property int wallpaperRevision: 0
       property int addCalls: 0
       property int saveCalls: 0
+      property bool suspended: false
 
       function wallpaperFor(name) {
         wallpaperRevision
@@ -82,7 +83,7 @@ TestCase {
         saveCalls += 1
         wallpaperRevision += 1
       }
-      function addWallpaper() { addCalls += 1 }
+      function addWallpaper() { addCalls += 1; suspended = true }
 
       function touch() { revision += 1 }
       function hide() { hidden = true }
@@ -587,5 +588,19 @@ TestCase {
     controller.setWallpaper("/pic/two.png")
     compare(controller.wallpapers.span, undefined, "the span survived the pick")
     compare(controller.wallpaperFor("eDP-1"), "/pic/two.png")
+  }
+
+  function test_the_overlay_stands_aside_for_the_file_chooser() {
+    // The chooser is an ordinary window and ordinary windows render below a
+    // layer-shell overlay, so a dialog opened from here appears behind the
+    // panel -- and cannot be typed into either, since the panel holds keyboard
+    // focus exclusively. The panel has to get out of the way and come back.
+    compare(view.visible, true)
+    mouseClick(find("addWallpaper"))
+    compare(controller.addCalls, 1)
+    compare(view.visible, false, "the panel stayed on top of the chooser")
+
+    controller.suspended = false      // what the process exiting does
+    compare(view.visible, true, "the panel did not come back")
   }
 }

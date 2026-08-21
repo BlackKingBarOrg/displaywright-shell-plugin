@@ -18,8 +18,13 @@ Item {
   property var pal: null
 
   readonly property var geo: controller ? controller.geo : null
+  //: The overlay stands down while a dialog that cannot be drawn above it is
+  //: on screen. Mirrored here so it can be checked without a compositor.
+  readonly property bool suspended: !!controller && controller.suspended === true
   readonly property var states: controller ? controller.states : []
   readonly property bool ready: !!geo
+
+  visible: !view.suspended
 
   Rectangle {
     anchors.fill: parent
