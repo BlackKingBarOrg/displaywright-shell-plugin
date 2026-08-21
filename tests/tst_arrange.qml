@@ -358,10 +358,32 @@ TestCase {
     compare(controller.states[0].mode.refresh, 60)
   }
 
-  function test_cycling_the_scale_changes_it() {
+  function test_picking_a_scale_changes_it() {
     compare(controller.states[0].scale, 2)
     pick("scale", "1.25")
     compare(controller.states[0].scale, 1.25)
+  }
+
+  function test_scales_below_one_are_offered() {
+    // A large low-density panel wants everything smaller. 0.8 is not a corner
+    // case here: it is what one of the displays on the machine this was
+    // reported from is running.
+    const options = find("scale").options
+    verify(options.indexOf("0.5") !== -1, "no 0.5")
+    verify(options.indexOf("0.8") !== -1, "no 0.8")
+    verify(options.indexOf("0.95") !== -1, "no 0.95")
+    pick("scale", "0.8")
+    compare(controller.states[0].scale, 0.8)
+  }
+
+  function test_a_scale_the_display_is_running_is_shown_even_if_unusual() {
+    // Hyprland takes any scale and Omarchy's display settings write ones the
+    // list does not have, so the control has to fold the current value in.
+    controller.states[0].scale = 0.83
+    controller.touch()
+    const control = find("scale")
+    compare(control.current, "0.83", "the control cannot show the current scale")
+    verify(control.options.indexOf("0.83") !== -1, "and cannot put it back")
   }
 
   function test_every_control_shows_what_the_display_is_actually_set_to() {

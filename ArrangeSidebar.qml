@@ -158,7 +158,12 @@ Item {
             popupLayer: sidebar.popupLayer
             objectName: "scale"
             pal: sidebar.pal
-          options: ["1", "1.25", "1.5", "1.75", "2", "2.5"]
+          options: {
+            sidebar.rev
+            if (!sidebar.ready) return []
+            return sidebar.geo.scaleChoices(sidebar.state.scale)
+              .map(sidebar.geo.trimNumber)
+          }
           current: { sidebar.rev; return sidebar.ready ? sidebar.geo.trimNumber(sidebar.state.scale) : "" }
           onPicked: function (value) { sidebar.edit(s => { s.scale = parseFloat(value) }) }
         }

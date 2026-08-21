@@ -162,3 +162,37 @@ test("the laptop panel is recognised", () => {
   assert.equal(G.isBuiltin({ name: "DP-1" }), false)
   assert.equal(G.isBuiltin({ name: "HDMI-A-1" }), false)
 })
+
+test("the scale list runs below 1 as well as above", () => {
+  // A large low-density panel wants everything smaller, not larger.
+  assert.ok(G.COMMON_SCALES.includes(0.5))
+  assert.ok(G.COMMON_SCALES.includes(0.8))
+  assert.ok(G.COMMON_SCALES.includes(0.95))
+  assert.ok(G.COMMON_SCALES.includes(2))
+  assert.deepEqual(G.COMMON_SCALES, G.COMMON_SCALES.slice().sort((a, b) => a - b),
+    "the list is not in order")
+})
+
+test("the scale a display is actually running is always offered", () => {
+  // Hyprland takes any scale, and Omarchy's own display settings write ones
+  // this list does not have. Leaving it out means the control cannot show it.
+  const odd = G.scaleChoices(0.83)
+  assert.ok(odd.includes(0.83), "the current scale was dropped")
+  assert.deepEqual(odd, odd.slice().sort((a, b) => a - b))
+  // One already on the list is not duplicated.
+  const known = G.scaleChoices(0.8)
+  assert.equal(known.filter(s => s === 0.8).length, 1)
+  assert.equal(known.length, G.COMMON_SCALES.length)
+})
+
+test("a scale of zero or nonsense is ignored", () => {
+  assert.deepEqual(G.scaleChoices(0), G.COMMON_SCALES)
+  assert.deepEqual(G.scaleChoices(undefined), G.COMMON_SCALES)
+})
+
+test("suggesting a scale still prefers the sensible one", () => {
+  // The extra values must not pull the suggestion off a panel that was right.
+  const laptop = G.stateFromHyprctl(LAPTOP)
+  assert.equal(G.suggestScale(laptop), 2)
+  assert.equal(G.suggestScale(G.stateFromHyprctl(ULTRAWIDE)), 1)
+})
