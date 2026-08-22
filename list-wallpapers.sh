@@ -23,7 +23,11 @@ search=()
 for dir in "${dirs[@]}"; do [[ -d $dir ]] && search+=("$dir"); done
 (( ${#search[@]} )) || exit 0
 
+# Only what Qt can actually decode. This build ships plugins for jpeg, gif,
+# ico and svg on top of the built-in png and bmp, and has no AVIF, JPEG XL or
+# WebP decoder -- listing one would offer a picture that draws as nothing.
+# add-wallpaper.sh converts those on the way in instead.
 find -L "${search[@]}" -maxdepth 2 -type f \
-  \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \
-     -o -iname '*.bmp' -o -iname '*.gif' -o -iname '*.avif' -o -iname '*.jxl' \) \
+  \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \
+     -o -iname '*.bmp' -o -iname '*.gif' -o -iname '*.svg' \) \
   2>/dev/null | sort -u
