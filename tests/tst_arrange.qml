@@ -85,6 +85,20 @@ TestCase {
       }
       function addWallpaper() { addCalls += 1; suspended = true }
 
+      property string wallpaperHome: "/pic"
+      property var removed: []
+      function removeWallpaper(path) {
+        if (!path) return
+        var m = wallpapers.monitors || {}
+        for (var name in m) {
+          if (m[name] && String(m[name].path) === String(path)) delete m[name]
+        }
+        wallpapers.monitors = m
+        removed.push(path)
+        wallpaperFiles = wallpaperFiles.filter(function (f) { return f !== path })
+        wallpaperRevision += 1
+      }
+
       function touch() { revision += 1 }
       function hide() { hidden = true }
       function apply() { applyCalls += 1 }
@@ -122,7 +136,8 @@ TestCase {
     controller.states = [monitor("eDP-1", 3200, 2000, 0, 0, 2), monitor("DP-1", 2560, 1440, 1600, 0)]
     controller.liveStates = controller.states.map(Geo.copyState)
     controller.selectedName = "eDP-1"
-    controller.wallpaperFiles = ["/pic/one.png", "/pic/two.png", "/pic/three.png"]
+    // Two of ours and one from the theme, which is not ours to delete.
+    controller.wallpaperFiles = ["/pic/one.png", "/pic/two.png", "/theme/stock.png"]
     view = viewComp.createObject(suite, {
       controller: controller,
       pal: paletteComp.createObject(suite),
@@ -557,9 +572,9 @@ TestCase {
   function test_switching_display_switches_what_the_strip_highlights() {
     controller.setWallpaper("/pic/one.png")          // eDP-1
     controller.selectedName = "DP-1"
-    controller.setWallpaper("/pic/three.png")
+    controller.setWallpaper("/theme/stock.png")
     compare(controller.wallpaperFor("eDP-1"), "/pic/one.png")
-    compare(controller.wallpaperFor("DP-1"), "/pic/three.png")
+    compare(controller.wallpaperFor("DP-1"), "/theme/stock.png")
   }
 
   function test_follow_theme_hands_the_display_back() {
@@ -602,5 +617,46 @@ TestCase {
 
     controller.suspended = false      // what the process exiting does
     compare(view.visible, true, "the panel did not come back")
+  }
+
+  // -------------------------------------------------------------- removing
+
+  function hoverRemove(file) {
+    const row = findChild(find("wallpaperList"), "wallpaper-" + file)
+    verify(row !== null, "no tile for " + file)
+    mouseMove(row, row.width / 2, row.height / 2)
+    return findChild(find("wallpaperList"), "remove-" + file)
+  }
+
+  function test_a_picture_we_brought_in_can_be_removed() {
+    const button = hoverRemove("one.png")
+    verify(button !== null, "no remove control")
+    verify(button.visible, "the remove control is not shown on hover")
+    mouseClick(button)
+    compare(controller.removed.length, 1)
+    compare(controller.removed[0], "/pic/one.png")
+  }
+
+  function test_the_themes_own_backgrounds_cannot_be_removed() {
+    // The strip lists them so the picker is not emptier than the one it
+    // replaces, but they belong to the theme and this tool cannot put one back.
+    const button = hoverRemove("stock.png")
+    verify(button === null || !button.visible,
+      "offered to delete a picture belonging to the theme")
+  }
+
+  function test_removing_a_picture_takes_its_assignments_with_it() {
+    // A display left pointing at a file that is gone draws nothing and says
+    // nothing about why.
+    controller.setWallpaper("/pic/one.png")
+    compare(controller.wallpaperFor("eDP-1"), "/pic/one.png")
+    controller.removeWallpaper("/pic/one.png")
+    compare(controller.wallpaperFor("eDP-1"), "", "the display still points at a deleted file")
+  }
+
+  function test_a_removed_picture_leaves_the_strip() {
+    compare(find("wallpaperList").count, 3)
+    controller.removeWallpaper("/pic/two.png")
+    compare(find("wallpaperList").count, 2)
   }
 }

@@ -141,8 +141,11 @@ arrangement doubles as the preview.
 
 **Add…** brings in a file from anywhere through the desktop file chooser and
 copies it into `~/Pictures/Displaywright`, so the wallpaper survives you
-emptying `~/Downloads`. **Follow theme** hands a display back to the Omarchy
-theme background.
+emptying `~/Downloads`. A format Qt cannot draw — AVIF, WebP, JPEG XL — is
+converted to PNG on the way in. Hovering a picture you added shows a **×** that
+puts it in the trash and hands any display using it back to the theme; the
+theme's own backgrounds have no ×, since they are not this tool's to delete.
+**Follow theme** hands the selected display back on its own.
 
 Applying a layout takes effect immediately and then asks to keep or revert with
 a fifteen-second countdown that defaults to revert — a display that goes black

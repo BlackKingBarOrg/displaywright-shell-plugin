@@ -17,6 +17,13 @@ Item {
   function c(role, fallback) { return pal && pal[role] !== undefined ? pal[role] : fallback }
 
   readonly property var files: controller ? controller.wallpaperFiles : []
+  readonly property string ownedDir: controller ? controller.wallpaperHome : ""
+
+  //: The theme's own backgrounds are listed here too, and they are not ours to
+  //: delete. Only what Add… brought in offers a remove.
+  function removable(path) {
+    return ownedDir.length > 0 && String(path).indexOf(ownedDir + "/") === 0
+  }
   readonly property string currentPath: {
     if (!controller) return ""
     controller.wallpaperRevision
@@ -110,9 +117,44 @@ Item {
           }
 
           MouseArea {
+            id: hit
             anchors.fill: parent
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: if (strip.controller) strip.controller.setWallpaper(parent.modelData)
+          }
+
+          //: Shown on hover rather than always: a delete button under every
+          //: thumbnail is a delete button somebody hits while choosing.
+          Rectangle {
+            objectName: "remove-" + parent.modelData.split("/").pop()
+            visible: strip.removable(parent.modelData) && (hit.containsMouse || removeHit.containsMouse)
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: 4
+            width: 20
+            height: 20
+            radius: 10
+            color: strip.c("background", "#16161d")
+            border.color: strip.c("border", "#33333f")
+            border.width: 1
+
+            Text {
+              anchors.centerIn: parent
+              text: "×"
+              color: strip.c("text", "#e6e6ea")
+              font.pixelSize: 14
+            }
+
+            MouseArea {
+              id: removeHit
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                if (strip.controller) strip.controller.removeWallpaper(parent.parent.modelData)
+              }
+            }
           }
         }
       }

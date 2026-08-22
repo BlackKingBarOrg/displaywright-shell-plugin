@@ -300,6 +300,38 @@ Item {
     }
   }
 
+  //: Only pictures under here can be removed; the rest belong to the theme.
+  readonly property string wallpaperHome: home + "/Pictures/Displaywright"
+
+  Process {
+    id: removeWallpaperProc
+    command: ["true"]
+    onExited: {
+      listWallpapersProc.running = true
+      root.wallpaperRevision += 1
+    }
+  }
+
+  function removeWallpaper(path) {
+    if (!path || removeWallpaperProc.running) return
+    // A display left pointing at a file that is gone draws nothing and says
+    // nothing, so the assignments go with it.
+    var monitors = root.wallpapers.monitors || {}
+    var dropped = false
+    for (var name in monitors) {
+      if (monitors[name] && String(monitors[name].path) === String(path)) {
+        delete monitors[name]
+        dropped = true
+      }
+    }
+    if (dropped) {
+      root.wallpapers.monitors = monitors
+      saveWallpapers()
+    }
+    removeWallpaperProc.command = [root.pluginDir + "/remove-wallpaper.sh", String(path)]
+    removeWallpaperProc.running = true
+  }
+
   function addWallpaper() {
     if (addWallpaperProc.running) return
     root.suspended = true
