@@ -22,9 +22,12 @@ QtObject {
     Quickshell.env("HOME") + "/.local/share/applications"
   readonly property string marker: "^X-Displaywright-Managed=true$"
 
-  //: Two entries, written by one script. A second execDetached from this same
-  //: handler never runs in omarchy-shell -- the first one does, every time --
-  //: so everything that has to happen, happens in one call.
+  //: Run through setsid. "Detached" only means Quickshell stops waiting on
+  //: it: the child stays in the shell's process group, and omarchy-shell tears
+  //: its plugin services down over and over while installing, which takes the
+  //: group with it. That is why a toast never arrived, why a script that slept
+  //: never came back, and why this loop wrote its first file and died before
+  //: the second. Its own session survives.
   readonly property string installScript:
       'dir=$1; apps=$2; mark=$3\n'
     + 'mkdir -p "$apps" || exit 0\n'
@@ -65,7 +68,7 @@ QtObject {
     //: execDetached reports nothing back, so this line is the only evidence
     //: that the entry was attempted. It has been needed twice.
     console.log("displaywright: installing launcher entries in " + root.appsDir)
-    Quickshell.execDetached(["sh", "-c", installScript, "sh",
+    Quickshell.execDetached(["setsid", "sh", "-c", installScript, "sh",
                              dir, root.appsDir, marker])
   }
 
@@ -73,7 +76,7 @@ QtObject {
   // first, so the service is torn down while the entry is still ours.
   Component.onDestruction: {
     if (!installed) return
-    Quickshell.execDetached(["sh", "-c", removeScript, "sh", root.appsDir,
+    Quickshell.execDetached(["setsid", "sh", "-c", removeScript, "sh", root.appsDir,
                              marker, root.sourceDir])
   }
 }
