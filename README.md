@@ -8,7 +8,7 @@ always cropped to fill**. This plugin draws on top of it, taking over only the
 displays you give a picture to — with a fit for each, and a colour or a video
 where you want one.
 
-![each display showing its own wallpaper, at its real position, size and rotation](preview.png)
+![the arrangement overlay: three displays dragged into place, each drawn with the wallpaper it is set to, and the picture strip along the bottom](preview.png)
 
 ## Install
 

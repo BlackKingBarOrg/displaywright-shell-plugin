@@ -113,6 +113,7 @@ Item {
       //: Cropped to fill, which is the default and what all but one of the fits
       //: look like at this size.
       Image {
+        id: wallpaper
         anchors.fill: parent
         anchors.margins: tile.border.width
         visible: source != "" && tile.state.enabled
@@ -129,7 +130,22 @@ Item {
         opacity: 0.85              // let the tile's selection colour through
       }
 
+      //: Pale text on a photograph is unreadable about as often as not, and
+      //: which half of the picture the label lands on is not ours to choose.
+      //: Drawn only when there is something under it, so a tile with no
+      //: wallpaper keeps its flat look.
+      Rectangle {
+        objectName: "labelPlate"
+        anchors.centerIn: labels
+        width: labels.width + 18
+        height: labels.height + 12
+        radius: 6
+        color: "#a6000000"
+        visible: wallpaper.visible && wallpaper.status === Image.Ready
+      }
+
       Column {
+        id: labels
         anchors.centerIn: parent
         spacing: 2
         Text {

@@ -670,4 +670,28 @@ TestCase {
     controller.removeWallpaper("/pic/two.png")
     compare(find("wallpaperList").count, 2)
   }
+
+  function test_a_tile_plates_its_label_only_when_a_picture_is_under_it() {
+    // The label sits in the middle of the tile, and which half of a photograph
+    // that lands on is not ours to choose -- pale sky behind pale text is
+    // unreadable. A tile with no wallpaper has nothing to hide behind and
+    // should stay flat.
+    const tile = tileFor("DP-1")
+    verify(tile !== null, "no tile for DP-1")
+    const before = findChild(tile, "labelPlate")
+    verify(before === null || !before.visible,
+           "a tile with no wallpaper should not be plated")
+
+    // A file that really decodes, so this pins the drawn result rather than
+    // the binding's spelling. The plugin ships one.
+    const real = String(Qt.resolvedUrl("../preview.png")).replace("file://", "")
+    controller.selectedName = "DP-1"
+    controller.setWallpaper(real)
+
+    const plate = findChild(tile, "labelPlate")
+    verify(plate !== null, "no plate behind the label")
+    tryVerify(function () { return plate.visible }, 3000,
+              "the label is left over bare picture")
+    verify(plate.width > 0 && plate.height > 0, "an empty plate hides nothing")
+  }
 }
