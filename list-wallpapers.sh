@@ -24,12 +24,18 @@ for dir in "${dirs[@]}"; do [[ -d $dir ]] && search+=("$dir"); done
 (( ${#search[@]} )) || exit 0
 
 # Every line here becomes a thumbnail in the strip -- an Image, decoded, in the
-# shell's own process. So the walk is bounded three ways: -H follows only the
-# three directories named above and never a symlink found inside one (a link to
-# /usr/share would otherwise enumerate it), the count is capped, and a path long
-# past anything real is dropped rather than passed on. A picture symlinked into
-# one of these folders is not listed; add-wallpaper.sh copies rather than links,
-# so nothing this plugin puts there is affected.
+# shell's own process. So the walk is bounded before anything expensive runs:
+#
+#   -H       follows only the three directories named above, never a symlink
+#            found inside one, which would otherwise enumerate whatever it
+#            points at.
+#   awk      drops a path longer than anything real, counts, and exits at the
+#            limit. Exiting closes the pipe, so find stops walking rather than
+#            finishing a tree nobody will see.
+#   sort     therefore never receives more than the cap. It used to run over
+#            the whole traversal and `head` applied the limit afterwards, so a
+#            large or hostile tree exhausted traversal and sort resources
+#            before the advertised cap did anything at all.
 MAX_FILES=${DW_MAX_WALLPAPERS:-500}
 MAX_PATH=${DW_MAX_PATH:-512}
 
@@ -41,6 +47,17 @@ find -H "${search[@]}" -maxdepth 2 -type f \
   \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \
      -o -iname '*.bmp' -o -iname '*.gif' -o -iname '*.svg' \) \
   2>/dev/null \
-  | awk -v max="$MAX_PATH" 'length($0) <= max' \
-  | LC_ALL=C sort -u \
-  | head -n "$MAX_FILES"
+  | awk -v maxp="$MAX_PATH" -v maxn="$MAX_FILES" '
+      length($0) > maxp { next }
+      n >= maxn { stopped = 1; exit }
+      { print; n++ }
+      END {
+        if (stopped)
+          print "list-wallpapers: stopped at " maxn " pictures; the rest are not listed" \
+            > "/dev/stderr"
+      }
+    ' \
+  | LC_ALL=C sort -u
+
+# find is closed early by design, so the pipeline status says nothing useful.
+exit 0
