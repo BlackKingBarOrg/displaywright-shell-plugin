@@ -16,11 +16,22 @@ where you want one.
 omarchy plugin add https://github.com/BlackKingBarOrg/displaywright-shell-plugin.git --enable
 ```
 
-That is the whole install, and it changes nothing yet. The stock renderer stays
-switched on and keeps every display exactly as it was — along with the theme
+That is the whole install on a machine that has not had this plugin before.
+Nothing you can see on your displays changes: the stock renderer stays switched
+on and keeps every one of them exactly as it was — along with the theme
 background, the SUPER + CTRL + SPACE switcher and the palette that changes with
 your theme. This plugin only draws on a display once you have given that display
-a picture of its own.
+a picture of its own. What it does add is a row in the Apps menu, which is how
+you open it.
+
+**Updating from an earlier version needs the shell restarted as well.** The one
+running is still the one compiled before the update, so a file the plugin has
+only just gained cannot execute — including the file that adds that row:
+
+```bash
+omarchy plugin update ai.bkblab.displaywright
+omarchy restart shell
+```
 
 Needs Omarchy 4.x with `omarchy-shell`. Video wallpapers also need
 `qt6-multimedia-ffmpeg`.
