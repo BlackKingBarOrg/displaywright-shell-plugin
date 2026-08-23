@@ -30,8 +30,22 @@ QtObject {
     + 'sed "s|@ICON@|$4|" "$1" > "$tmp" || exit 0\n'
     + 'if cmp -s "$tmp" "$2"; then rm -f "$tmp"; else mv -f "$tmp" "$2"; fi\n'
 
+  //: $1 the entry, $2 the marker, $3 this plugin's own manifest.
+  //: Every hot-reload tears the service down and builds it again, and from in
+  //: here that is indistinguishable from a disable or a remove. Deleting on all
+  //: three raced the incoming instance's install -- two detached shells with no
+  //: ordering between them -- and lost often enough to leave no launcher entry
+  //: at all. omarchy-plugin-remove deletes the plugin folder *before* it asks
+  //: the shell to rescan, so a folder still on disk means this teardown is a
+  //: reload and the entry has to outlive it.
+  //: Disable is the one case this reads as a reload, and it leaves an entry
+  //: behind that toggles a disabled plugin, which is to say nothing. A row that
+  //: does nothing until you enable the plugin again beats a row that vanishes
+  //: on its own; --remove in install-shortcuts.sh takes it out on request.
   readonly property string removeScript:
-    'grep -q "$2" "$1" 2>/dev/null && rm -f "$1"\n'
+      'grep -q "$2" "$1" 2>/dev/null || exit 0\n'
+    + '[ -e "$3" ] && exit 0\n'
+    + 'rm -f "$1"\n'
 
   property bool installed: false
 
@@ -50,10 +64,13 @@ QtObject {
                              dir + "/icon.png"])
   }
 
-  // Reached on disable and on remove alike: omarchy-plugin-remove disables
-  // first, so the service is torn down while the entry is still ours.
   Component.onDestruction: {
     if (!installed) return
-    Quickshell.execDetached(["sh", "-c", removeScript, "sh", dest, marker])
+    var dir = manifest && manifest.__sourceDir
+    //: No folder to test means no way to tell a reload from a removal, and
+    //: keeping the entry is the half that cannot lose one.
+    if (!dir) return
+    Quickshell.execDetached(["sh", "-c", removeScript, "sh",
+                             dest, marker, dir + "/manifest.json"])
   }
 }

@@ -153,11 +153,23 @@ a fifteen-second countdown that defaults to revert — a display that goes black
 cannot lock you out. Keeping it writes the layout to
 `~/.config/hypr/monitors.lua`, leaving everything outside its own block alone.
 
-Press **SUPER + ALT + SPACE** for the Apps menu and type `Displays`. Installing
-the plugin puts it there; nothing to set up first.
+Press **SUPER + ALT + SPACE** for the Apps menu and type `Displays`. A fresh
+install puts it there with nothing to set up.
 
-For a row in the Omarchy menu (SUPER + SPACE) and a keybinding as well, run
-this once:
+**An update does not.** The shell compiled the old `Wallpaper.qml` before this
+version's files existed and goes on running what it compiled, so the code that
+would write the entry never gets to run — and a hot-reload rebuilds the service
+from the same stale compile. Restart the shell and it appears:
+
+```bash
+omarchy plugin update ai.bkblab.displaywright
+omarchy restart shell
+```
+
+For a row in the Omarchy menu (SUPER + SPACE) and a keybinding as well, run this
+once. It writes the launcher entry itself rather than waiting for the service to,
+and restarts the shell at the end, which makes it the single command that
+finishes an update too:
 
 ```bash
 ~/.config/omarchy/plugins/ai.bkblab.displaywright/install-shortcuts.sh
@@ -166,8 +178,8 @@ this once:
 It picks the first key nothing else has claimed, asking Hyprland rather than
 reading your config, and prints what it chose. If every candidate is taken it
 stops and tells you — it will never unbind something of yours to make room.
-Both edits go between markers, so running it again changes nothing, and
-`--remove` takes out exactly what it added.
+Every edit goes between markers, so running it again changes nothing, it reports
+only what actually landed, and `--remove` takes out exactly what it added.
 
 A plugin cannot do this for itself: Omarchy's manifest has no field for a
 keybinding or a menu row, and `omarchy plugin add` deliberately runs nothing
@@ -191,9 +203,12 @@ File issues against the source repository.
 omarchy plugin remove ai.bkblab.displaywright
 ```
 
-Run the first line only if you ran the installer; it takes the keybinding and
-the menu row back out. Nothing else to put back: the stock renderer was never
-switched off.
+Run the first line only if you ran the installer; it takes the keybinding, the
+menu row and the launcher entry back out. Removing the plugin on its own clears
+the launcher entry as well — `omarchy plugin remove` deletes the folder before it
+tells the shell, and that is how the service knows a teardown is a removal and
+not one of the reloads it has to survive. Nothing else to put back: the stock
+renderer was never switched off.
 
 ## Issues
 
