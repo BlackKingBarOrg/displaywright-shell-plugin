@@ -35,7 +35,8 @@ QtObject {
   //: plugin is not permitted to register one for itself. Clicking the toast
   //: runs the installer in a terminal, so the long path never has to be typed.
   readonly property string welcomeScript:
-      'state=${XDG_STATE_HOME:-$HOME/.local/state}/displaywright\n'
+      'sleep 5\n'
+    + 'state=${XDG_STATE_HOME:-$HOME/.local/state}/displaywright\n'
     + '[ -e "$state/welcomed" ] && exit 0\n'
     + 'mkdir -p "$state" || exit 0\n'
     + ': > "$state/welcomed"\n'
@@ -77,18 +78,15 @@ QtObject {
     Quickshell.execDetached(["sh", "-c", installScript, "sh",
                              dir + "/displaywright.desktop", dest, marker,
                              dir + "/icon.png"])
-    root.scriptPath = dir + "/install-shortcuts.sh"
-    welcomeTimer.start()
-  }
-
-  property string scriptPath: ""
-
-  //: The notification daemon is the shell itself, which is still starting up
-  //: when a service is created. A toast sent into that gap is simply lost.
-  property Timer welcomeTimer: Timer {
-    interval: 5000
-    onTriggered: Quickshell.execDetached(["sh", "-c", root.welcomeScript, "sh",
-                                          root.scriptPath])
+    //: The notification daemon is the shell itself, still starting up when a
+    //: service is created, so a toast sent into that gap is lost. The wait
+    //: lives in the script: a QML Timer here started but never fired inside
+    //: omarchy-shell, three clean installs out of three, while firing every
+    //: time under a bare Quickshell. Rather than keep guessing at the
+    //: difference, this uses the one mechanism already proven in the real
+    //: host -- the same execDetached that writes the entry.
+    Quickshell.execDetached(["sh", "-c", welcomeScript, "sh",
+                             dir + "/install-shortcuts.sh"])
   }
 
   // Reached on disable and on remove alike: omarchy-plugin-remove disables
