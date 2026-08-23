@@ -167,14 +167,13 @@ o.bind("SUPER + P", "Displays", "omarchy-shell shell summon ai.bkblab.displaywri
 Escape closes it. This half needs nothing but Hyprland — it talks to `hyprctl`
 directly and does not care whether the wallpaper renderer is doing anything.
 
-## Prefer clicking to editing JSON?
-
-A window with a picture library and a live preview of every fit is a separate
-project:
+## Source
 
 **https://github.com/BlackKingBarOrg/displaywright**
 
-It writes the same file, and installs this same renderer for you.
+This repository is generated from that one's `plugin/` directory, so that
+`manifest.json` sits at a repository root the way `omarchy plugin add` needs.
+File issues against the source repository.
 
 ## Remove
 
