@@ -93,10 +93,25 @@ strip_block() {  # file begin end
   sed -i "\|$2|,\|$3|d" -- "$1"
 }
 
+# hyprctl says which keys are occupied but not what they run: a Lua config
+# reports every binding as dispatcher "__lua". So "is one of these already
+# ours" can only be answered from the text, and a miss here costs a redundant
+# second key rather than anything broken.
+existing_binding() {
+  grep -n -- "$PLUGIN_ID" "$1" 2>/dev/null | grep -v ':[[:space:]]*--' | head -1
+}
+
 install_binding() {
-  local file combo
+  local file combo found
   file=$(real_path "$BINDINGS")
   [[ -f $file ]] || die "no bindings file at $file"
+
+  found=$(existing_binding "$file")
+  if [[ -n $found ]]; then
+    say "a key for this plugin is already set up at $file:${found%%:*}"
+    say "leaving it alone -- delete that line and re-run to have it managed here"
+    return 0
+  fi
 
   if ! combo=$(choose_combo); then
     cat >&2 <<MSG
@@ -130,6 +145,13 @@ install_menu() {
 
   backup "$file"
   strip_block "$file" "$JBEGIN" "$JEND"
+
+  # A hand-added row under the same id would become a duplicate JSON key --
+  # legal, silently last-one-wins, and baffling to debug.
+  if grep -qE '^[[:space:]]*"displays"[[:space:]]*:' -- "$file"; then
+    say "a \"displays\" row already exists in $file -- leaving it alone"
+    return 0
+  fi
 
   # A trailing comma is only safe when a key follows ours. Ours goes in right
   # after the opening brace, so "a key follows" means the file already has one.
