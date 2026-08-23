@@ -543,15 +543,13 @@ TestCase {
   function test_the_strip_lists_every_picture_it_was_given() {
     const list = find("wallpaperList")
     verify(list !== null, "no wallpaper strip")
-    compare(list.count, 3)
+    tryCompare(list, "count", 3)
     compare(list.orientation, ListView.Horizontal, "the strip is not horizontal")
   }
 
   function test_choosing_a_picture_gives_it_to_the_selected_display_only() {
     compare(controller.selectedName, "eDP-1")
-    const row = findChild(find("wallpaperList"), "wallpaper-two.png")
-    verify(row !== null, "no tile for two.png")
-    mouseClick(row)
+    mouseClick(wallpaperTile("two.png"))
     compare(controller.wallpaperFor("eDP-1"), "/pic/two.png")
     compare(controller.wallpaperFor("DP-1"), "", "the other display was touched")
   }
@@ -621,9 +619,22 @@ TestCase {
 
   // -------------------------------------------------------------- removing
 
+  //: A view's delegates are not built the instant the view is, so a lookup
+  //: straight after creation finds them or does not depending on the run. This
+  //: waits, which is the difference between a test and a coin toss.
+  function wallpaperTile(file) {
+    const list = find("wallpaperList")
+    verify(list !== null, "no wallpaper strip")
+    var row = null
+    tryVerify(function () {
+      row = findChild(list, "wallpaper-" + file)
+      return row !== null
+    }, 2000, "no tile for " + file)
+    return row
+  }
+
   function hoverRemove(file) {
-    const row = findChild(find("wallpaperList"), "wallpaper-" + file)
-    verify(row !== null, "no tile for " + file)
+    const row = wallpaperTile(file)
     mouseMove(row, row.width / 2, row.height / 2)
     return findChild(find("wallpaperList"), "remove-" + file)
   }
