@@ -18,47 +18,38 @@ QtObject {
 
   property var manifest: null
 
-  readonly property string dest:
-    Quickshell.env("HOME") + "/.local/share/applications/displaywright.desktop"
+  readonly property string appsDir:
+    Quickshell.env("HOME") + "/.local/share/applications"
   readonly property string marker: "^X-Displaywright-Managed=true$"
 
+  //: Two entries, written by one script. A second execDetached from this same
+  //: handler never runs in omarchy-shell -- the first one does, every time --
+  //: so everything that has to happen, happens in one call.
   readonly property string installScript:
-      '[ -f "$1" ] || exit 0\n'
-    + 'if [ -e "$2" ] && ! grep -q "$3" "$2"; then exit 0; fi\n'
-    + 'mkdir -p "${2%/*}" || exit 0\n'
-    + 'tmp=$2.displaywright.new\n'
-    + 'sed "s|@ICON@|$4|" "$1" > "$tmp" || exit 0\n'
-    + 'if cmp -s "$tmp" "$2"; then rm -f "$tmp"; else mv -f "$tmp" "$2"; fi\n'
+      'dir=$1; apps=$2; mark=$3\n'
+    + 'mkdir -p "$apps" || exit 0\n'
+    + 'for n in displaywright displaywright-shortcuts; do\n'
+    + '  src=$dir/$n.desktop; dst=$apps/$n.desktop\n'
+    + '  [ -f "$src" ] || continue\n'
+    + '  if [ -e "$dst" ] && ! grep -q "$mark" "$dst"; then continue; fi\n'
+    + '  tmp=$dst.displaywright.new\n'
+    + '  sed -e "s|@ICON@|$dir/icon.png|" -e "s|@SCRIPT@|$dir/install-shortcuts.sh|" "$src" > "$tmp" || continue\n'
+    + '  if cmp -s "$tmp" "$dst"; then rm -f "$tmp"; else mv -f "$tmp" "$dst"; fi\n'
+    + 'done\n'
 
-  //: Shown once, ever. Someone who has just installed a plugin has no reason
-  //: to guess that a keybinding needs a separate command -- still less that a
-  //: plugin is not permitted to register one for itself. Clicking the toast
-  //: runs the installer in a terminal, so the long path never has to be typed.
-  readonly property string welcomeScript:
-      'state=${XDG_STATE_HOME:-$HOME/.local/state}/displaywright\n'
-    + '[ -e "$state/welcomed" ] && exit 0\n'
-    + 'mkdir -p "$state" || exit 0\n'
-    + ': > "$state/welcomed"\n'
-    + 'command -v omarchy-notification-send >/dev/null || exit 0\n'
-    + 'omarchy-notification-send -u normal -g "󰍹" \\\n'
-    + '  --exec "omarchy-launch-floating-terminal-with-presentation $1" \\\n'
-    + '  "Displaywright is ready" \\\n'
-    + '  "Open it with SUPER + ALT + SPACE, then type Displays. Click this to add a keyboard shortcut and an Omarchy menu row."\n'
-
-  //: The shell destroys and recreates every plugin service on each reload,
-  //: and `omarchy plugin add` fires dozens of reloads while it installs. A
-  //: destruction is therefore almost never an uninstall -- and because these
-  //: run detached and unordered, a remove that fires on a reload deletes the
-  //: entry the next instance just wrote. That is why the entry was missing
-  //: after a fresh install, every time.
-  //:
-  //: The plugin folder is the discriminator: still there means a reload, gone
-  //: means the plugin really went. The wait lets the removal finish first --
-  //: omarchy-plugin-remove disables the plugin before it moves the folder.
+  //: A destruction is almost never an uninstall: the shell tears every plugin
+  //: service down and rebuilds it on each reload, and `omarchy plugin add`
+  //: fires dozens of those while installing. Deleting here on every teardown
+  //: removed the entry the next instance had just written, which is why a
+  //: fresh install ended with nothing in the launcher. The plugin folder is
+  //: the discriminator -- still there means a reload.
   readonly property string removeScript:
-      'sleep 3\n'
-    + '[ -d "$3" ] && exit 0\n'
-    + 'grep -q "$2" "$1" 2>/dev/null && rm -f "$1"\n'
+      'dir=$3; apps=$1; mark=$2\n'
+    + '[ -d "$dir" ] && exit 0\n'
+    + 'for n in displaywright displaywright-shortcuts; do\n'
+    + '  f=$apps/$n.desktop\n'
+    + '  grep -q "$mark" "$f" 2>/dev/null && rm -f "$f"\n'
+    + 'done\n'
 
   property bool installed: false
   property string sourceDir: ""
@@ -73,24 +64,16 @@ QtObject {
     root.sourceDir = dir
     //: execDetached reports nothing back, so this line is the only evidence
     //: that the entry was attempted. It has been needed twice.
-    console.log("displaywright: installing launcher entry at " + dest)
+    console.log("displaywright: installing launcher entries in " + root.appsDir)
     Quickshell.execDetached(["sh", "-c", installScript, "sh",
-                             dir + "/displaywright.desktop", dest, marker,
-                             dir + "/icon.png"])
-    //: Sent with no delay of any kind. A QML Timer never fired here, and a
-    //: `sleep` inside the detached script never came back either -- both work
-    //: under a bare Quickshell, and neither survives the teardown storm that
-    //: omarchy-shell puts a plugin through while it installs. Anything that
-    //: waits gets collected; only work done immediately lands.
-    Quickshell.execDetached(["sh", "-c", welcomeScript, "sh",
-                             dir + "/install-shortcuts.sh"])
+                             dir, root.appsDir, marker])
   }
 
   // Reached on disable and on remove alike: omarchy-plugin-remove disables
   // first, so the service is torn down while the entry is still ours.
   Component.onDestruction: {
     if (!installed) return
-    Quickshell.execDetached(["sh", "-c", removeScript, "sh", dest, marker,
-                             root.sourceDir])
+    Quickshell.execDetached(["sh", "-c", removeScript, "sh", root.appsDir,
+                             marker, root.sourceDir])
   }
 }
