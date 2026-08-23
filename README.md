@@ -153,16 +153,14 @@ a fifteen-second countdown that defaults to revert — a display that goes black
 cannot lock you out. Keeping it writes the layout to
 `~/.config/hypr/monitors.lua`, leaving everything outside its own block alone.
 
-It opens on request rather than living in the bar:
+Open it from the app launcher: press **SUPER + SPACE** and type `Displays`,
+`Monitors` or `Displaywright`. Installing the plugin puts it there — there is
+nothing to set up first.
 
-```bash
-omarchy-shell shell summon ai.bkblab.displaywright '{}'
-```
-
-Worth a key. In `~/.config/hypr/bindings.lua`:
+If you would rather have a key of your own, in `~/.config/hypr/bindings.lua`:
 
 ```lua
-o.bind("SUPER + P", "Displays", "omarchy-shell shell summon ai.bkblab.displaywright '{}'")
+o.bind("SUPER + P", "Displays", "omarchy-shell shell toggle ai.bkblab.displaywright")
 ```
 
 Escape closes it. This half needs nothing but Hyprland — it talks to `hyprctl`

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Displaywright
+GenericName=Displays and Wallpapers
+Comment=Arrange your displays and give each one its own wallpaper
+Exec=omarchy-shell shell toggle ai.bkblab.displaywright
+TryExec=omarchy-shell
+Icon=@ICON@
+Terminal=false
+StartupNotify=false
+Categories=Settings;HardwareSettings;DesktopSettings;
+Keywords=display;displays;monitor;monitors;screen;arrange;arrangement;resolution;refresh;scale;rotate;rotation;wallpaper;wallpapers;background;backgrounds;hyprland;omarchy;
+X-Displaywright-Managed=true
