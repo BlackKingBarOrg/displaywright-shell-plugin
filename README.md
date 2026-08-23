@@ -153,15 +153,25 @@ a fifteen-second countdown that defaults to revert — a display that goes black
 cannot lock you out. Keeping it writes the layout to
 `~/.config/hypr/monitors.lua`, leaving everything outside its own block alone.
 
-Open it from the app launcher: press **SUPER + SPACE** and type `Displays`,
-`Monitors` or `Displaywright`. Installing the plugin puts it there — there is
-nothing to set up first.
+Press **SUPER + ALT + SPACE** for the Apps menu and type `Displays`. Installing
+the plugin puts it there; nothing to set up first.
 
-If you would rather have a key of your own, in `~/.config/hypr/bindings.lua`:
+For a row in the Omarchy menu (SUPER + SPACE) and a keybinding as well, run
+this once:
 
-```lua
-o.bind("SUPER + P", "Displays", "omarchy-shell shell toggle ai.bkblab.displaywright")
+```bash
+~/.config/omarchy/plugins/ai.bkblab.displaywright/install-shortcuts.sh
 ```
+
+It picks the first key nothing else has claimed, asking Hyprland rather than
+reading your config, and prints what it chose. If every candidate is taken it
+stops and tells you — it will never unbind something of yours to make room.
+Both edits go between markers, so running it again changes nothing, and
+`--remove` takes out exactly what it added.
+
+A plugin cannot do this for itself: Omarchy's manifest has no field for a
+keybinding or a menu row, and `omarchy plugin add` deliberately runs nothing
+from inside a plugin. Hence a command you run rather than an install step.
 
 Escape closes it. This half needs nothing but Hyprland — it talks to `hyprctl`
 directly and does not care whether the wallpaper renderer is doing anything.
@@ -177,10 +187,13 @@ File issues against the source repository.
 ## Remove
 
 ```bash
+~/.config/omarchy/plugins/ai.bkblab.displaywright/install-shortcuts.sh --remove
 omarchy plugin remove ai.bkblab.displaywright
 ```
 
-Nothing to put back: the stock renderer was never switched off.
+Run the first line only if you ran the installer; it takes the keybinding and
+the menu row back out. Nothing else to put back: the stock renderer was never
+switched off.
 
 ## Issues
 
