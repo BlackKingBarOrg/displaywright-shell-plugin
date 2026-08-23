@@ -1,6 +1,7 @@
-# Displaywright — per-display wallpapers for Omarchy
+# Displaywright — per-display wallpapers and display arrangement for Omarchy
 
-A different wallpaper on each display, with every fit mode Windows has.
+A different wallpaper on each display, with every fit mode Windows has, and an
+overlay for dragging your displays into place.
 
 Omarchy's built-in background renderer shows **one image on every display,
 always cropped to fill**. This plugin draws on top of it, taking over only the
