@@ -48,7 +48,10 @@ Item {
   //: Omarchy installs no launcher entry for a plugin, so the service writes
   //: one. Without it the overlay has no name to search for and no icon to
   //: click, which is indistinguishable from not being installed.
-  readonly property LauncherEntry launcher: LauncherEntry { manifest: root.manifest }
+  //: A plain child rather than a typed property: resolving a sibling .qml as
+  //: a property *type* is stricter than instantiating it, and this file is
+  //: the one whose failure takes every wallpaper on the desktop with it.
+  LauncherEntry { manifest: root.manifest }
 
   //: A plain-value snapshot of the shell theme, for the same reason.
   readonly property var palette: ({

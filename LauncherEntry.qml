@@ -42,6 +42,9 @@ QtObject {
     var dir = manifest && manifest.__sourceDir
     if (installed || !dir) return
     installed = true
+    //: execDetached reports nothing back, so this line is the only evidence
+    //: that the entry was attempted. It has been needed twice.
+    console.log("displaywright: installing launcher entry at " + dest)
     Quickshell.execDetached(["sh", "-c", installScript, "sh",
                              dir + "/displaywright.desktop", dest, marker,
                              dir + "/icon.png"])
