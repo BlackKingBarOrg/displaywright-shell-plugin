@@ -164,7 +164,6 @@ Item {
   }
 
   onPluginDirChanged: root.reloadConfig()
-  Component.onCompleted: root.reloadConfig()
 
   // ------------------------------------------------------ span geometry
   //
@@ -233,7 +232,10 @@ Item {
 
   // --------------------------------------------------------------- surfaces
 
-  Component.onCompleted: refreshSpanBox()
+  Component.onCompleted: {
+    root.refreshSpanBox()
+    root.reloadConfig()
+  }
 
   Variants {
     model: Quickshell.screens
