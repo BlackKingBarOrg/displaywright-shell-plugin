@@ -115,28 +115,58 @@ Item {
     configRevision += 1
   }
 
-  FileView {
-    id: configFile
-    path: root.configPath
-    watchChanges: true
-    printErrors: false
-    // `text()` is stale inside onFileChanged, so both the first load and every
-    // later change are routed through reload() -> onLoaded.
-    onFileChanged: reload()
-    onLoaded: root.parseConfig(text())
-    onLoadFailed: root.parseConfig("")
+  //: This file is user-writable, and FileView reads whatever the path resolves
+  //: to: no size limit, no way to refuse a device, no no-follow. It reads into
+  //: the shell's own process, so a wallpapers.json of a few gigabytes -- or one
+  //: symlinked at /dev/zero -- would take the whole desktop down rather than
+  //: this plugin. read-config.sh bounds it: regular files only, and never more
+  //: than its cap.
+  readonly property string pluginDir: manifest && manifest.__sourceDir
+    ? String(manifest.__sourceDir) : ""
+  readonly property string configDir: configHome + "/displaywright"
+
+  Process {
+    id: configReader
+    command: root.pluginDir ? [root.pluginDir + "/read-config.sh", root.configPath] : ["true"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.parseConfig(text)
+    }
   }
 
-  // The config file usually does not exist yet. FileView cannot watch a path
-  // that is absent, so watch the directory that will hold it and re-arm once
-  // it appears.
-  FileView {
-    id: configDirProbe
-    path: root.configHome + "/displaywright"
-    watchChanges: true
-    printErrors: false
-    onFileChanged: configFile.reload()
+  function reloadConfig() {
+    if (!root.pluginDir || configReader.running) return
+    configReader.running = true
   }
+
+  //: A FileView on the file would read it, which is the thing being avoided,
+  //: and a FileView on the directory does not fire on an in-place write --
+  //: checked, and "save it and the renderer picks it up" is documented
+  //: behaviour. inotifywait is what omarchy's own plugin registry watches
+  //: with, and it reports the change without reading the file.
+  Process {
+    id: configWatcher
+    running: root.pluginDir !== ""
+    command: ["sh", "-c",
+      'mkdir -p "$1" 2>/dev/null; '
+      + 'exec inotifywait -m -q -e close_write,create,move,delete --format %f "$1"',
+      "sh", root.configDir]
+    stdout: SplitParser {
+      onRead: function (name) {
+        if (String(name).trim() === "wallpapers.json") root.reloadConfig()
+      }
+    }
+    onExited: configWatcherRestart.restart()
+  }
+
+  Timer {
+    id: configWatcherRestart
+    interval: 1000
+    onTriggered: if (root.pluginDir) configWatcher.running = true
+  }
+
+  onPluginDirChanged: root.reloadConfig()
+  Component.onCompleted: root.reloadConfig()
 
   // ------------------------------------------------------ span geometry
   //

@@ -86,6 +86,7 @@ Item {
     if (!ready) { console.warn("displaywright: the arrangement needs the renderer service"); return }
     reload()
     loadWallpapers()
+    if (root.pluginDir && !monitorsReader.running) monitorsReader.running = true
     listWallpapersProc.running = true
     root.opened = true
   }
@@ -218,6 +219,8 @@ Item {
   readonly property string wallpapersPath: configHome + "/displaywright/wallpapers.json"
   property var wallpapers: ({ version: 1, monitors: {} })
   property var wallpaperFiles: []
+  readonly property int maxWallpapers: 500
+  readonly property int maxPathLength: 512
   property int wallpaperRevision: 0
 
   function wallpaperFor(name) {
@@ -227,17 +230,33 @@ Item {
     return entry && entry.path ? String(entry.path) : ""
   }
 
+  //: Written through, never read through: FileView has no size limit and no
+  //: way to refuse a device, and this one read with blockLoading -- on the main
+  //: thread -- a file any user can replace. Reads go through read-config.sh.
   FileView {
     id: wallpapersFile
     path: root.wallpapersPath
     printErrors: false
-    blockLoading: true
+  }
+
+  Process {
+    id: wallpapersReader
+    command: root.pluginDir
+      ? [root.pluginDir + "/read-config.sh", root.wallpapersPath] : ["true"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.applyWallpapers(text)
+    }
   }
 
   function loadWallpapers() {
+    if (!root.pluginDir || wallpapersReader.running) return
+    wallpapersReader.running = true
+  }
+
+  function applyWallpapers(text) {
     var parsed = { version: 1, monitors: {} }
     try {
-      var text = wallpapersFile.text()
       if (text && text.trim().length) {
         var raw = JSON.parse(text)
         if (raw && typeof raw === "object") {
@@ -284,8 +303,19 @@ Item {
     id: listWallpapersProc
     command: [root.pluginDir + "/list-wallpapers.sh"]
     stdout: StdioCollector {
+      //: Capped again on this side. list-wallpapers.sh bounds what it emits,
+      //: but every line here becomes an Image decoded in the shell's process,
+      //: so the count that reaches the model does not depend on a script
+      //: staying correct.
       onStreamFinished: {
-        var lines = String(text || "").split("\n").filter(function (l) { return l.length > 0 })
+        var lines = String(text || "").split("\n").filter(function (l) {
+          return l.length > 0 && l.length <= root.maxPathLength
+        })
+        if (lines.length > root.maxWallpapers) {
+          console.warn("displaywright: " + lines.length + " pictures found, showing "
+            + root.maxWallpapers)
+          lines = lines.slice(0, root.maxWallpapers)
+        }
         root.wallpaperFiles = lines
       }
     }
@@ -354,10 +384,23 @@ Item {
     blockLoading: true
   }
 
+  //: Read when the overlay opens rather than at save time: the read is a
+  //: bounded subprocess now, and Apply is not a moment to be waiting on one.
+  property string monitorsText: ""
+
+  Process {
+    id: monitorsReader
+    command: root.pluginDir
+      ? [root.pluginDir + "/read-config.sh", root.monitorsPath] : ["true"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.monitorsText = text
+    }
+  }
+
   function save() {
     if (!ready) return
-    var existing = ""
-    try { existing = monitorsFile.text() } catch (e) { existing = "" }
+    var existing = root.monitorsText
     // Everything outside displaywright's own block survives, and a laptop panel
     // switched off is written through Omarchy's toggle rather than as a rule
     // nothing would ever remove.
