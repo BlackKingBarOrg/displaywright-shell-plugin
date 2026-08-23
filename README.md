@@ -38,10 +38,25 @@ Needs Omarchy 4.x with `omarchy-shell`. Video wallpapers also need
 
 ## Use
 
-**Double-click a display's background.** Omarchy's own picture picker opens, and
-whatever you choose becomes that display's wallpaper — that display only, the
-rest of your desktop untouched. Do it again on the next screen to give it a
-different one.
+**Open it from the Apps menu: SUPER + ALT + SPACE, then type `Displays`.** That
+is the arrangement window — drag your displays into place, set resolution,
+refresh rate, scale and rotation, and give the selected display a wallpaper from
+the strip along the bottom. Escape closes it. [What is in it](#the-arrangement-window)
+is further down.
+
+Installing puts that row in the Apps menu; updating from an earlier version
+needs the shell restarted first, as above. For a keyboard shortcut and a row in
+the Omarchy menu (SUPER + SPACE) as well, run this once — it finishes an update
+on its own too:
+
+```bash
+~/.config/omarchy/plugins/ai.bkblab.displaywright/install-shortcuts.sh
+```
+
+**Double-click a display's background** to give just that display a wallpaper,
+without opening anything. Omarchy's own picture picker comes up, and whatever
+you choose becomes that display's wallpaper — that display only, the rest of
+your desktop untouched. Do it again on the next screen to give it a different one.
 
 It offers your theme's backgrounds, anything you have dropped in
 `~/.config/omarchy/backgrounds/<theme>/`, and the folder the Displaywright app
@@ -164,31 +179,12 @@ a fifteen-second countdown that defaults to revert — a display that goes black
 cannot lock you out. Keeping it writes the layout to
 `~/.config/hypr/monitors.lua`, leaving everything outside its own block alone.
 
-Press **SUPER + ALT + SPACE** for the Apps menu and type `Displays`. A fresh
-install puts it there with nothing to set up.
-
-**An update does not.** The shell compiled the old `Wallpaper.qml` before this
-version's files existed and goes on running what it compiled, so the code that
-would write the entry never gets to run — and a hot-reload rebuilds the service
-from the same stale compile. Restart the shell and it appears:
-
-```bash
-omarchy plugin update ai.bkblab.displaywright
-omarchy restart shell
-```
-
-For a row in the Omarchy menu (SUPER + SPACE) and a keybinding as well, run this
-once. It writes the launcher entry itself rather than waiting for the service to,
-and restarts the shell at the end, which makes it the single command that
-finishes an update too:
-
-```bash
-~/.config/omarchy/plugins/ai.bkblab.displaywright/install-shortcuts.sh
-```
-
-It picks the first key nothing else has claimed, asking Hyprland rather than
-reading your config, and prints what it chose. If every candidate is taken it
-stops and tells you — it will never unbind something of yours to make room.
+`install-shortcuts.sh`, from [Use](#use) above, writes the launcher entry itself
+rather than waiting for the service to — which is what makes it finish an update
+as well — and adds the Omarchy menu row and a key. It picks the first key nothing
+else has claimed, asking Hyprland rather than reading your config, and prints
+what it chose. If every candidate is taken it stops and tells you — it will
+never unbind something of yours to make room.
 Every edit goes between markers, so running it again changes nothing, it reports
 only what actually landed, and `--remove` takes out exactly what it added.
 
@@ -196,8 +192,8 @@ A plugin cannot do this for itself: Omarchy's manifest has no field for a
 keybinding or a menu row, and `omarchy plugin add` deliberately runs nothing
 from inside a plugin. Hence a command you run rather than an install step.
 
-Escape closes it. This half needs nothing but Hyprland — it talks to `hyprctl`
-directly and does not care whether the wallpaper renderer is doing anything.
+This half needs nothing but Hyprland — it talks to `hyprctl` directly and does
+not care whether the wallpaper renderer is doing anything.
 
 ## Source
 
