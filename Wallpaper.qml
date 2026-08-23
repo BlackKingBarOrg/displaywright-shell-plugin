@@ -22,6 +22,7 @@ import qs.Commons
 import "lib/geometry.mjs" as Geo
 import "lib/snapping.mjs" as Snap
 import "lib/luawriter.mjs" as Lua
+import "lib/applyflow.mjs" as Flow
 
 Item {
   id: root
@@ -42,6 +43,7 @@ Item {
   readonly property var geo: Geo
   readonly property var snap: Snap
   readonly property var lua: Lua
+  readonly property var flow: Flow
 
   //: A plain-value snapshot of the shell theme, for the same reason.
   readonly property var palette: ({

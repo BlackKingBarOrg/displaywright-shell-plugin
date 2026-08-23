@@ -28,6 +28,7 @@ Item {
   readonly property var geo: service ? service.geo : null
   readonly property var snap: service ? service.snap : null
   readonly property var lua: service ? service.lua : null
+  readonly property var flow: service ? service.flow : null
   readonly property bool ready: !!geo
 
   readonly property ArrangePalette pal: ArrangePalette {
@@ -136,7 +137,7 @@ Item {
     command: ["true"]
     onExited: {
       root.busy = ""
-      if (root.countdown === 0 && root.opened) root.startCountdown()
+      root.setFlow(root.flow.finished(root.applyFlow))
     }
   }
 
@@ -159,7 +160,10 @@ Item {
   }
 
   function apply() {
-    if (root.busy !== "" || !ready) return
+    if (!ready) return
+    const next = root.flow.begin(root.applyFlow)
+    if (next === root.applyFlow) return  // hyprctl is still working
+    root.setFlow(next)
     root.snapshot = root.liveStates.map(root.geo.copyState)
     applyStates(root.states)
   }
@@ -172,38 +176,41 @@ Item {
 
   // ------------------------------------------------------- keep or revert
 
-  function startCountdown() {
-    root.countdown = 15
-    countdownTimer.restart()
+  //: The phases live in lib/applyflow.mjs, where they can be tested -- this
+  //: file cannot be, since Quickshell's types only load inside the shell.
+  property var applyFlow: ({ phase: "idle", seconds: 0 })
+
+  function setFlow(next) {
+    root.applyFlow = next
+    root.countdown = next.seconds
+    countdownTimer.running = next.phase === "confirming"
+    if (root.flow.pushesSnapshot(next)) {
+      if (root.snapshot && root.snapshot.length) {
+        root.states = root.snapshot.map(root.geo.copyState)
+        root.touch()
+        applyStates(root.snapshot)
+      }
+      root.notice = "Reverted to the previous arrangement"
+    }
   }
 
   Timer {
     id: countdownTimer
     interval: 1000
     repeat: true
-    onTriggered: {
-      root.countdown -= 1
-      if (root.countdown <= 0) root.revert()
-    }
+    onTriggered: root.setFlow(root.flow.tick(root.applyFlow))
   }
 
   function keep() {
-    countdownTimer.stop()
-    root.countdown = 0
+    if (root.applyFlow.phase !== "confirming") return
+    root.setFlow(root.flow.keep(root.applyFlow))
     root.liveStates = root.states.map(root.geo.copyState)
     root.touch()
     root.save()
   }
 
   function revert() {
-    countdownTimer.stop()
-    root.countdown = 0
-    if (root.snapshot && root.snapshot.length) {
-      root.states = root.snapshot.map(root.geo.copyState)
-      root.touch()
-      applyStates(root.snapshot)
-    }
-    root.notice = "Reverted to the previous arrangement"
+    root.setFlow(root.flow.revert(root.applyFlow))
   }
 
   // -------------------------------------------------------------- wallpapers
