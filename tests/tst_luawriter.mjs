@@ -148,3 +148,49 @@ test("render_file is merge plus render_block", () => {
   const b = L.merge(EXISTING, L.renderBlock([laptop()]), new Set(["eDP-1"]))
   assert.equal(a, b)
 })
+
+test("a display that is unplugged keeps its rule", () => {
+  // Reported from a real desk: a rotated, scaled display was unplugged, the
+  // layout was saved, and the block came back with only the two that were
+  // still connected -- so plugging the third back in brought it up square and
+  // unscaled, with no record anywhere of how it had been set up.
+  const both = L.renderFile("", [laptop(), ultrawide()])
+  const portrait = state({
+    name: "DP-2", make: "Acme", model: "Portrait", scale: 0.8, transform: 1, x: 4160,
+    mode: { width: 2560, height: 1440, refresh: 60 },
+    availableModes: [{ width: 2560, height: 1440, refresh: 60 }],
+  })
+  const three = L.renderFile(both, [laptop(), ultrawide(), portrait])
+  assert.ok(three.includes('output = "DP-2"'))
+
+  // Now it is gone from hyprctl, as an unplugged display is.
+  const two = L.renderFile(three, [laptop(), ultrawide()])
+  assert.ok(two.includes('output = "DP-2"'), "the unplugged display lost its rule")
+  assert.ok(two.includes("transform = 1"), "and lost its rotation")
+  assert.ok(two.includes("scale = 0.8"), "and lost its scale")
+  assert.ok(two.includes("Not connected right now"), "with nothing to say why it is there")
+})
+
+test("a display that comes back is written from the live layout, not the kept rule", () => {
+  const three = L.renderFile("", [laptop(), ultrawide()])
+  const gone = L.renderFile(three, [laptop()])
+  assert.ok(gone.includes('output = "DP-1"'))
+
+  // Plugged back in and moved: one rule, and it is the new one.
+  const moved = state({
+    name: "DP-1", make: "CSF", model: "CS3421", scale: 1, x: 9000,
+    mode: { width: 3440, height: 1440, refresh: 50 },
+    availableModes: [{ width: 3440, height: 1440, refresh: 50 }],
+  })
+  const back = L.renderFile(gone, [laptop(), moved])
+  assert.equal(back.split('output = "DP-1"').length - 1, 1, "the display has two rules")
+  assert.ok(back.includes('position = "9000x0"'))
+})
+
+test("rules outside the managed block are not hoovered up", () => {
+  // The catch-all and any hand-written rule stay where the user put them.
+  const existing = 'hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1 })\n'
+  const written = L.renderFile(existing, [laptop()])
+  const kept = L.rulesInBlock(written)
+  assert.ok(!Object.prototype.hasOwnProperty.call(kept, ""), "adopted the catch-all")
+})
