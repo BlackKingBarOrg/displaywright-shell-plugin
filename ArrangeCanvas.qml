@@ -116,7 +116,7 @@ Item {
         id: wallpaper
         anchors.fill: parent
         anchors.margins: tile.border.width
-        visible: source != "" && tile.state.enabled
+        visible: source !== "" && tile.state.enabled
         source: {
           if (view.controller) view.controller.wallpaperRevision
           var path = view.controller ? view.controller.wallpaperFor(tile.state.name) : ""

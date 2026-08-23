@@ -121,8 +121,6 @@ Item {
   //: symlinked at /dev/zero -- would take the whole desktop down rather than
   //: this plugin. read-config.sh bounds it: regular files only, and never more
   //: than its cap.
-  readonly property string pluginDir: manifest && manifest.__sourceDir
-    ? String(manifest.__sourceDir) : ""
   readonly property string configDir: configHome + "/displaywright"
 
   Process {
