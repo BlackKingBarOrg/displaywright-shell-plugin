@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "ai.bkblab.displaywright",
   "name": "Displaywright",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "author": "bkblab.ai",
   "license": "MIT",
-  "description": "Per-display wallpapers and a display arrangement editor, inside omarchy-shell. Open it from the launcher with SUPER+SPACE and type Displays.",
+  "description": "Per-display wallpapers and a display arrangement editor, inside omarchy-shell. Open it from the Apps menu: SUPER+ALT+SPACE, then type Displays. Or double-click one display's background to give just that display a wallpaper.",
   "kinds": [
     "service",
     "overlay"
