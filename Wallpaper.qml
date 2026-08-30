@@ -211,7 +211,7 @@ Item {
     target: "displaywright"
 
     function reload(): string {
-      configFile.reload()
+      root.reloadConfig()
       root.refreshSpanBox()
       return "ok"
     }
