@@ -134,6 +134,14 @@ Item {
 
   function reloadConfig() {
     if (!root.pluginDir || configReader.running) return
+    //: pluginDir arrives after the service is constructed, and this runs from
+    //: its change handler -- before the command binding above has been
+    //: re-evaluated. Starting the process there would run the ["true"]
+    //: placeholder, collect nothing, and leave every output on the theme
+    //: background until wallpapers.json was next written. Set the command
+    //: outright so the read is against the path, not against whichever
+    //: binding pass got there first.
+    configReader.command = [root.pluginDir + "/read-config.sh", root.configPath]
     configReader.running = true
   }
 
