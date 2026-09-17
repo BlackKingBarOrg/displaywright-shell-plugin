@@ -222,6 +222,22 @@ renderer was never switched off.
 This repository is generated from `plugin/` in the project above, so bug reports
 and pull requests belong there.
 
+## Thanks
+
+Fixes that came in as pull requests against this mirror, ported into the source
+tree with their authors credited on the commits:
+
+- [Macho0x](https://github.com/Macho0x) — traced the empty `pluginDir` on
+  Omarchy 4.0.3 to the host sanitising `__sourceDir`, and resolved the plugin
+  directory from the entry files instead
+  ([#3](https://github.com/BlackKingBarOrg/displaywright-shell-plugin/pull/3)).
+- [Paweł Waszkiewicz](https://github.com/FizykPSX) — found that `wallpapers.json`
+  was not read at startup and that the `reload` IPC target was broken, and fixed
+  both ([#2](https://github.com/BlackKingBarOrg/displaywright-shell-plugin/pull/2)).
+- [Terry Tai](https://github.com/terrytai) — made the launcher entry survive a
+  shell reload and actually install on an update
+  ([#1](https://github.com/BlackKingBarOrg/displaywright-shell-plugin/pull/1)).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
