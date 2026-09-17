@@ -17,6 +17,7 @@ QtObject {
   id: root
 
   property var manifest: null
+  property string pluginDir: ""
 
   readonly property string dest:
     Quickshell.env("HOME") + "/.local/share/applications/displaywright.desktop"
@@ -53,7 +54,7 @@ QtObject {
   // Component.onCompleted, so the paths are built when it arrives rather than
   // bound -- a binding has not re-evaluated by the time that fires.
   onManifestChanged: {
-    var dir = manifest && manifest.__sourceDir
+    var dir = root.pluginDir
     if (installed || !dir) return
     installed = true
     //: execDetached reports nothing back, so this line is the only evidence
@@ -66,11 +67,10 @@ QtObject {
 
   Component.onDestruction: {
     if (!installed) return
-    var dir = manifest && manifest.__sourceDir
     //: No folder to test means no way to tell a reload from a removal, and
     //: keeping the entry is the half that cannot lose one.
-    if (!dir) return
+    if (!root.pluginDir) return
     Quickshell.execDetached(["sh", "-c", removeScript, "sh",
-                             dest, marker, dir + "/manifest.json"])
+                             dest, marker, root.pluginDir + "/manifest.json"])
   }
 }

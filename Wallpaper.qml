@@ -51,7 +51,7 @@ Item {
   //: A plain child rather than a typed property: resolving a sibling .qml as
   //: a property *type* is stricter than instantiating it, and this file is
   //: the one whose failure takes every wallpaper on the desktop with it.
-  LauncherEntry { manifest: root.manifest }
+  LauncherEntry { manifest: root.manifest; pluginDir: root.pluginDir }
 
   //: A plain-value snapshot of the shell theme, for the same reason.
   readonly property var palette: ({
@@ -67,11 +67,16 @@ Item {
   readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")
   readonly property string configPath: configHome + "/displaywright/wallpapers.json"
 
-  // Where this plugin was loaded from. The shell stamps it into the manifest;
-  // hardcoding an install path would break a symlinked checkout and anyone who
-  // installed by hand somewhere else.
-  readonly property string pluginDir: manifest && manifest.__sourceDir
-    ? String(manifest.__sourceDir) : ""
+  // Where this plugin was loaded from: this file sits at the plugin root, so
+  // the directory resolves from here. Third-party manifests do not carry the
+  // host's private `__sourceDir` (Omarchy 4.0.3 sanitizes it), and hardcoding
+  // an install path would break a symlinked checkout and anyone who installed
+  // by hand somewhere else.
+  readonly property string pluginDir: {
+    var url = String(Qt.resolvedUrl("."))
+    if (url.indexOf("file://") !== 0) return ""
+    try { return decodeURIComponent(url.substring(7)).replace(/\/$/, "") } catch (e) { return "" }
+  }
 
   // ---------------------------------------------------------------- config
 
@@ -134,6 +139,16 @@ Item {
 
   function reloadConfig() {
     if (!root.pluginDir || configReader.running) return
+    //: The first call comes from onPluginDirChanged, which fires while this
+    //: object is still being built: the engine evaluates the root's bindings
+    //: before its children's, so configReader exists but its command binding
+    //: has not run yet. When pluginDir still arrived late, off the manifest,
+    //: the same handler ran ahead of the re-evaluation and started the ["true"]
+    //: placeholder instead -- it collected nothing, and every output sat on
+    //: the theme background until wallpapers.json was next written
+    //: (displaywright-shell-plugin#2). Set the command outright, so the read
+    //: is against the path whichever binding pass got there first.
+    configReader.command = [root.pluginDir + "/read-config.sh", root.configPath]
     configReader.running = true
   }
 
@@ -203,7 +218,7 @@ Item {
     target: "displaywright"
 
     function reload(): string {
-      configFile.reload()
+      root.reloadConfig()
       root.refreshSpanBox()
       return "ok"
     }

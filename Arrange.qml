@@ -53,8 +53,13 @@ Item {
   readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME") || (home + "/.config")
   readonly property string monitorsPath: configHome + "/hypr/monitors.lua"
   //: Where this plugin was loaded from, for the scripts shipped beside it.
-  readonly property string pluginDir: manifest && manifest.__sourceDir
-    ? String(manifest.__sourceDir) : ""
+  //: Third-party manifests do not carry the host's private `__sourceDir`
+  //: (Omarchy 4.0.3 sanitizes it), so resolve from this file at the root.
+  readonly property string pluginDir: {
+    var url = String(Qt.resolvedUrl("."))
+    if (url.indexOf("file://") !== 0) return ""
+    try { return decodeURIComponent(url.substring(7)).replace(/\/$/, "") } catch (e) { return "" }
+  }
 
   function touch() { revision += 1 }
 
