@@ -237,6 +237,9 @@ tree with their authors credited on the commits:
 - [Terry Tai](https://github.com/terrytai) — made the launcher entry survive a
   shell reload and actually install on an update
   ([#1](https://github.com/BlackKingBarOrg/displaywright-shell-plugin/pull/1)).
+- [Spacerox DAO](https://github.com/SpaceroxDAO) — independently diagnosed the
+  startup config read racing its own command binding, and fixed the `reload`
+  IPC target ([displaywright#1](https://github.com/BlackKingBarOrg/displaywright/pull/1)).
 
 ## License
 
